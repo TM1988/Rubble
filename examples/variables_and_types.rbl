@@ -1,0 +1,22 @@
+// Demonstrates slot, lock, all core types, and smelt
+
+slot count = 10
+slot ratio = 3.14
+slot label = "Rubble"
+slot flag   = true
+slot items  = [1, 2, 3, 4, 5]
+
+lock slot MAX = 100
+
+write "count  : " + smelt(count, text)
+write "ratio  : " + smelt(ratio, text)
+write "label  : " + label
+write "flag   : " + smelt(flag, text)
+write "items  : " + smelt(items.length(), text) + " items"
+write "MAX    : " + smelt(MAX, text)
+
+// Type casting
+slot as_text = smelt(42, text)
+slot as_num  = smelt("99", unit)
+write "smelt 42 -> text : " + as_text
+write "smelt \"99\" -> unit : " + smelt(as_num, text)

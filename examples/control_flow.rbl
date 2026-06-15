@@ -1,0 +1,31 @@
+// Demonstrates if / elif / else, loop, for-in, and jam
+
+// --- if / elif / else ---
+slot score = 75
+
+if score >= 90 {
+    write "Grade: A"
+} elif score >= 75 {
+    write "Grade: B"
+} elif score >= 60 {
+    write "Grade: C"
+} else {
+    write "Grade: F"
+}
+
+// --- loop (while) with jam (break) ---
+slot n = 0
+loop n < 10 {
+    if n == 5 {
+        write "Reached 5, jamming out of loop"
+        jam
+    }
+    n = n + 1
+}
+write "n after loop: " + smelt(n, text)
+
+// --- for-in over a crate ---
+slot fruits = ["apple", "banana", "cherry"]
+for fruit in fruits {
+    write "Fruit: " + fruit
+}

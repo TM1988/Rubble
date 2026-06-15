@@ -1,0 +1,37 @@
+// Demonstrates recipe (functions) and blueprint (structs)
+
+// --- Blueprint: a 2D Point ---
+blueprint Point {
+    x: decimal,
+    y: decimal
+}
+
+// --- Recipe: compute distance from origin ---
+recipe distance(p: Point) -> decimal {
+    slot dx = p.x * p.x
+    slot dy = p.y * p.y
+    yield dx + dy   // returns squared distance for simplicity (no sqrt built-in)
+}
+
+// --- Recipe: greet a user ---
+recipe greet(name: text) -> text {
+    yield "Hello, " + name + "!"
+}
+
+// --- Recipe: factorial (recursive) ---
+recipe factorial(n: unit) -> unit {
+    if n <= 1 {
+        yield 1
+    }
+    yield n * factorial(n - 1)
+}
+
+// Use them
+slot p1 = build Point(x: 3.0, y: 4.0)
+write "Point: x=" + smelt(p1.x, text) + " y=" + smelt(p1.y, text)
+write "Squared distance: " + smelt(distance(p1), text)
+
+write greet("Rubble")
+
+slot fact5 = factorial(5)
+write "5! = " + smelt(fact5, text)
