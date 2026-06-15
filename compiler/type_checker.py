@@ -87,7 +87,7 @@ class TypeChecker:
     def _seed_stdlib(self):
         """Register standard library functions and objects in the global scope."""
         # Stdlib objects (gather makes them available, but also seed globally)
-        for name in ("panel", "cabinet", "machinery", "cable", "canvas"):
+        for name in ("panel", "cabinet", "machinery", "cable", "canvas", "math"):
             self.globals.define(name, TypeNode(name))
         # Direct function aliases
         self.globals.define("panel_prompt", T_TEXT)
@@ -401,6 +401,25 @@ class TypeChecker:
                 ("canvas",   "show"):   T_EMPTY,
                 ("canvas",   "poll"):   T_UNIT,
                 ("canvas",   "close"):  T_EMPTY,
+                # canvas input
+                ("canvas",   "key"):       T_UNIT,
+                ("canvas",   "mouse_x"):   T_UNIT,
+                ("canvas",   "mouse_y"):   T_UNIT,
+                ("canvas",   "mouse_btn"): T_UNIT,
+                # math
+                ("math", "sqrt"):  T_DECIMAL, ("math", "cbrt"):  T_DECIMAL,
+                ("math", "pow"):   T_DECIMAL, ("math", "abs"):   T_DECIMAL,
+                ("math", "floor"): T_DECIMAL, ("math", "ceil"):  T_DECIMAL,
+                ("math", "round"): T_DECIMAL, ("math", "sin"):   T_DECIMAL,
+                ("math", "cos"):   T_DECIMAL, ("math", "tan"):   T_DECIMAL,
+                ("math", "asin"):  T_DECIMAL, ("math", "acos"):  T_DECIMAL,
+                ("math", "atan"):  T_DECIMAL, ("math", "atan2"): T_DECIMAL,
+                ("math", "log"):   T_DECIMAL, ("math", "log2"):  T_DECIMAL,
+                ("math", "log10"): T_DECIMAL, ("math", "exp"):   T_DECIMAL,
+                ("math", "min"):   T_DECIMAL, ("math", "max"):   T_DECIMAL,
+                ("math", "pi"):    T_DECIMAL, ("math", "e"):     T_DECIMAL,
+                ("math", "inf"):   T_DECIMAL, ("math", "clamp"): T_DECIMAL,
+                ("math", "lerp"):  T_DECIMAL,
             }
             # Check by object name
             if isinstance(node.callee.target, Ident):

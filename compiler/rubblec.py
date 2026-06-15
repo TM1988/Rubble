@@ -102,7 +102,7 @@ def main():
         tmp_bin.close()
         try:
             _compile(clang, ir, stdlib_c, tmp_bin.name)
-            result = subprocess.run([tmp_bin.name])
+            result = subprocess.run([tmp_bin.name], cwd=os.path.dirname(os.path.abspath(src)) or ".")
             sys.exit(result.returncode)
         finally:
             try:
@@ -125,8 +125,11 @@ def _compile(clang: str, ir: str, stdlib_c: str, out: str):
         if os.path.exists(stdlib_c):
             cmd.append(stdlib_c)
         canvas_c = os.path.join(os.path.dirname(stdlib_c), "rubble_canvas.c")
+        math_c   = os.path.join(os.path.dirname(stdlib_c), "rubble_math.c")
         if os.path.exists(canvas_c):
             cmd.append(canvas_c)
+        if os.path.exists(math_c):
+            cmd.append(math_c)
         # On Windows, canvas needs GDI and user32
         if sys.platform == "win32":
             cmd += ["-lgdi32", "-luser32"]

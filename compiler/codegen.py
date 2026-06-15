@@ -194,6 +194,43 @@ class CodeGen:
         self._emit('declare void @rubble_canvas_show(i64)')
         self._emit('declare i64  @rubble_canvas_poll(i64)')
         self._emit('declare void @rubble_canvas_close(i64)')
+        self._emit('declare i64  @rubble_canvas_key(i64, i64)')
+        self._emit('declare i64  @rubble_canvas_mouse_x(i64)')
+        self._emit('declare i64  @rubble_canvas_mouse_y(i64)')
+        self._emit('declare i64  @rubble_canvas_mouse_btn(i64, i64)')
+        self._emit('')
+        # math stdlib
+        self._emit('declare double @rubble_math_sqrt(double)')
+        self._emit('declare double @rubble_math_cbrt(double)')
+        self._emit('declare double @rubble_math_pow(double, double)')
+        self._emit('declare double @rubble_math_abs(double)')
+        self._emit('declare double @rubble_math_floor(double)')
+        self._emit('declare double @rubble_math_ceil(double)')
+        self._emit('declare double @rubble_math_round(double)')
+        self._emit('declare double @rubble_math_sin(double)')
+        self._emit('declare double @rubble_math_cos(double)')
+        self._emit('declare double @rubble_math_tan(double)')
+        self._emit('declare double @rubble_math_asin(double)')
+        self._emit('declare double @rubble_math_acos(double)')
+        self._emit('declare double @rubble_math_atan(double)')
+        self._emit('declare double @rubble_math_atan2(double, double)')
+        self._emit('declare double @rubble_math_log(double)')
+        self._emit('declare double @rubble_math_log2(double)')
+        self._emit('declare double @rubble_math_log10(double)')
+        self._emit('declare double @rubble_math_exp(double)')
+        self._emit('declare double @rubble_math_min(double, double)')
+        self._emit('declare double @rubble_math_max(double, double)')
+        self._emit('declare double @rubble_math_pi()')
+        self._emit('declare double @rubble_math_e()')
+        self._emit('declare double @rubble_math_inf()')
+        self._emit('declare double @rubble_math_clamp(double, double, double)')
+        self._emit('declare double @rubble_math_lerp(double, double, double)')
+        self._emit('')
+        # crate runtime
+        self._emit('declare i8*  @rubble_crate_new(i64, i64)')
+        self._emit('declare void @rubble_crate_push(i8*, i8*, i64)')
+        self._emit('declare i8*  @rubble_crate_get(i8*, i64, i64)')
+        self._emit('declare i64  @rubble_crate_len(i8*)')
         self._emit('')
         # String conversion helpers
         self._emit('declare i64 @atoll(i8*)')
@@ -905,29 +942,64 @@ class CodeGen:
 
         # Stdlib mappings
         stdlib = {
-            ("panel",    "prompt"):  ("rubble_panel_prompt",  "i8*",  ["i8*"]),
+            ("panel",    "prompt"):  ("rubble_panel_prompt",  "i8*",  []),
             ("panel",    "grab"):    ("rubble_panel_grab",    "i8*",  []),
-            ("machinery","rest"):    ("rubble_machinery_rest","void", ["i64"]),
+            ("machinery","rest"):    ("rubble_machinery_rest","void", []),
             ("machinery","ram"):     ("rubble_machinery_ram", "i64",  []),
-            ("machinery","halt"):    ("exit",                 "void", ["i32"]),
-            ("cabinet",  "open"):    ("rubble_cabinet_open",  "i64",  ["i8*"]),
-            ("cabinet",  "create"):  ("rubble_cabinet_create","i64",  ["i8*"]),
-            ("cable",    "connect"): ("rubble_cable_connect", "i64",  ["i8*", "i64"]),
-            # canvas
-            ("canvas",   "open"):    ("rubble_canvas_open",   "i64",  ["i8*", "i64", "i64"]),
-            ("canvas",   "clear"):   ("rubble_canvas_clear",  "void", ["i64", "i64", "i64", "i64"]),
-            ("canvas",   "rect"):    ("rubble_canvas_rect",   "void", ["i64","i64","i64","i64","i64","i64","i64","i64"]),
-            ("canvas",   "circle"):  ("rubble_canvas_circle", "void", ["i64","i64","i64","i64","i64","i64","i64"]),
-            ("canvas",   "line"):    ("rubble_canvas_line",   "void", ["i64","i64","i64","i64","i64","i64","i64","i64"]),
-            ("canvas",   "text"):    ("rubble_canvas_text",   "void", ["i64","i64","i64","i8*","i64","i64","i64"]),
-            ("canvas",   "show"):    ("rubble_canvas_show",   "void", ["i64"]),
-            ("canvas",   "poll"):    ("rubble_canvas_poll",   "i64",  ["i64"]),
-            ("canvas",   "close"):   ("rubble_canvas_close",  "void", ["i64"]),
+            ("machinery","halt"):    ("exit",                 "void", []),
+            ("cabinet",  "open"):    ("rubble_cabinet_open",  "i64",  []),
+            ("cabinet",  "create"):  ("rubble_cabinet_create","i64",  []),
+            ("cable",    "connect"): ("rubble_cable_connect", "i64",  []),
+            # canvas — drawing
+            ("canvas",   "open"):    ("rubble_canvas_open",   "i64",  []),
+            ("canvas",   "clear"):   ("rubble_canvas_clear",  "void", []),
+            ("canvas",   "rect"):    ("rubble_canvas_rect",   "void", []),
+            ("canvas",   "circle"):  ("rubble_canvas_circle", "void", []),
+            ("canvas",   "line"):    ("rubble_canvas_line",   "void", []),
+            ("canvas",   "text"):    ("rubble_canvas_text",   "void", []),
+            ("canvas",   "show"):    ("rubble_canvas_show",   "void", []),
+            ("canvas",   "poll"):    ("rubble_canvas_poll",   "i64",  []),
+            ("canvas",   "close"):   ("rubble_canvas_close",  "void", []),
+            # canvas — input
+            ("canvas",   "key"):     ("rubble_canvas_key",       "i64",  []),
+            ("canvas",   "mouse_x"): ("rubble_canvas_mouse_x",   "i64",  []),
+            ("canvas",   "mouse_y"): ("rubble_canvas_mouse_y",   "i64",  []),
+            ("canvas",   "mouse_btn"):("rubble_canvas_mouse_btn","i64",  []),
+            # math
+            ("math", "sqrt"):  ("rubble_math_sqrt",  "double", []),
+            ("math", "cbrt"):  ("rubble_math_cbrt",  "double", []),
+            ("math", "pow"):   ("rubble_math_pow",   "double", []),
+            ("math", "abs"):   ("rubble_math_abs",   "double", []),
+            ("math", "floor"): ("rubble_math_floor", "double", []),
+            ("math", "ceil"):  ("rubble_math_ceil",  "double", []),
+            ("math", "round"): ("rubble_math_round", "double", []),
+            ("math", "sin"):   ("rubble_math_sin",   "double", []),
+            ("math", "cos"):   ("rubble_math_cos",   "double", []),
+            ("math", "tan"):   ("rubble_math_tan",   "double", []),
+            ("math", "asin"):  ("rubble_math_asin",  "double", []),
+            ("math", "acos"):  ("rubble_math_acos",  "double", []),
+            ("math", "atan"):  ("rubble_math_atan",  "double", []),
+            ("math", "atan2"): ("rubble_math_atan2", "double", []),
+            ("math", "log"):   ("rubble_math_log",   "double", []),
+            ("math", "log2"):  ("rubble_math_log2",  "double", []),
+            ("math", "log10"): ("rubble_math_log10", "double", []),
+            ("math", "exp"):   ("rubble_math_exp",   "double", []),
+            ("math", "min"):   ("rubble_math_min",   "double", []),
+            ("math", "max"):   ("rubble_math_max",   "double", []),
+            ("math", "pi"):    ("rubble_math_pi",    "double", []),
+            ("math", "e"):     ("rubble_math_e",     "double", []),
+            ("math", "inf"):   ("rubble_math_inf",   "double", []),
+            ("math", "clamp"): ("rubble_math_clamp", "double", []),
+            ("math", "lerp"):  ("rubble_math_lerp",  "double", []),
         }
         key = (obj_name, method)
         if key in stdlib:
             fn, ret_ll, _ = stdlib[key]
-            arg_str = ", ".join(f"{llvm_type(t)} {v}" for v, t in args)
+            # Build arg string — use actual LLVM types from emitted args
+            arg_parts = []
+            for v, t in args:
+                arg_parts.append(f"{llvm_type(t)} {v}")
+            arg_str = ", ".join(arg_parts)
             if ret_ll == "void":
                 self._emit_indent(f'call void @{fn}({arg_str})')
                 return "null"
@@ -964,7 +1036,135 @@ class CodeGen:
         return "null"
 
     def _emit_crate_builtin(self, target, obj_t, method, args, reg):
-        # Simplified: just return null for now (full crate runtime needs stdlib C)
+        """Emit IR for built-in crate (array) methods."""
+        obj_val  = self._emit_expr(target)
+        inner    = obj_t.inner if obj_t.inner else T_UNIT
+        inner_ll = llvm_type(inner)
+        cname    = f"Crate_{inner_ll.replace('*','p').replace(' ','_')}"
+        self._crate_types.add((cname, inner_ll))
+
+        if method == "length":
+            lp = self._fresh("lp")
+            self._emit_indent(f'{lp} = getelementptr inbounds %{cname}, %{cname}* {obj_val}, i32 0, i32 0')
+            self._emit_indent(f'{reg} = load i64, i64* {lp}')
+            return reg
+
+        if method == "get":
+            idx  = args[0][0]
+            dp   = self._fresh("dp")
+            dp2  = self._fresh("dp2")
+            ep   = self._fresh("ep")
+            self._emit_indent(f'{dp} = getelementptr inbounds %{cname}, %{cname}* {obj_val}, i32 0, i32 1')
+            self._emit_indent(f'{dp2} = load {inner_ll}*, {inner_ll}** {dp}')
+            self._emit_indent(f'{ep} = getelementptr inbounds {inner_ll}, {inner_ll}* {dp2}, i64 {idx}')
+            self._emit_indent(f'{reg} = load {inner_ll}, {inner_ll}* {ep}')
+            return reg
+
+        if method == "set":
+            idx  = args[0][0]
+            val  = args[1][0]
+            dp   = self._fresh("dp")
+            dp2  = self._fresh("dp2")
+            ep   = self._fresh("ep")
+            self._emit_indent(f'{dp} = getelementptr inbounds %{cname}, %{cname}* {obj_val}, i32 0, i32 1')
+            self._emit_indent(f'{dp2} = load {inner_ll}*, {inner_ll}** {dp}')
+            self._emit_indent(f'{ep} = getelementptr inbounds {inner_ll}, {inner_ll}* {dp2}, i64 {idx}')
+            self._emit_indent(f'store {inner_ll} {val}, {inner_ll}* {ep}')
+            return "null"
+
+        if method == "push":
+            # Realloc: get current len, alloc new array of len+1, memcpy, store new elem
+            val     = args[0][0]
+            lp      = self._fresh("lp")
+            old_len = self._fresh("old_len")
+            new_len = self._fresh("new_len")
+            old_dp  = self._fresh("old_dp")
+            old_ptr = self._fresh("old_ptr")
+            sz      = self._fresh("sz")
+            raw     = self._fresh("raw")
+            new_ptr = self._fresh("new_ptr")
+            ep      = self._fresh("ep")
+            self._emit_indent(f'{lp} = getelementptr inbounds %{cname}, %{cname}* {obj_val}, i32 0, i32 0')
+            self._emit_indent(f'{old_len} = load i64, i64* {lp}')
+            self._emit_indent(f'{new_len} = add i64 {old_len}, 1')
+            self._emit_indent(f'{old_dp} = getelementptr inbounds %{cname}, %{cname}* {obj_val}, i32 0, i32 1')
+            self._emit_indent(f'{old_ptr} = load {inner_ll}*, {inner_ll}** {old_dp}')
+            self._emit_indent(f'{sz} = mul i64 {new_len}, 8')
+            self._emit_indent(f'{raw} = call i8* @malloc(i64 {sz})')
+            self._emit_indent(f'{new_ptr} = bitcast i8* {raw} to {inner_ll}*')
+            # copy old data
+            old_raw = self._fresh("old_raw")
+            old_sz  = self._fresh("old_sz")
+            self._emit_indent(f'{old_raw} = bitcast {inner_ll}* {old_ptr} to i8*')
+            self._emit_indent(f'{old_sz} = mul i64 {old_len}, 8')
+            self._emit_indent(f'call i8* @memcpy(i8* {raw}, i8* {old_raw}, i64 {old_sz})')
+            # store new element at [old_len]
+            self._emit_indent(f'{ep} = getelementptr inbounds {inner_ll}, {inner_ll}* {new_ptr}, i64 {old_len}')
+            self._emit_indent(f'store {inner_ll} {val}, {inner_ll}* {ep}')
+            # update crate struct
+            self._emit_indent(f'store i64 {new_len}, i64* {lp}')
+            self._emit_indent(f'store {inner_ll}* {new_ptr}, {inner_ll}** {old_dp}')
+            return "null"
+
+        if method == "pop":
+            lp      = self._fresh("lp")
+            old_len = self._fresh("old_len")
+            new_len = self._fresh("new_len")
+            dp      = self._fresh("dp")
+            ptr     = self._fresh("ptr")
+            ep      = self._fresh("ep")
+            self._emit_indent(f'{lp} = getelementptr inbounds %{cname}, %{cname}* {obj_val}, i32 0, i32 0')
+            self._emit_indent(f'{old_len} = load i64, i64* {lp}')
+            self._emit_indent(f'{new_len} = sub i64 {old_len}, 1')
+            self._emit_indent(f'{dp} = getelementptr inbounds %{cname}, %{cname}* {obj_val}, i32 0, i32 1')
+            self._emit_indent(f'{ptr} = load {inner_ll}*, {inner_ll}** {dp}')
+            self._emit_indent(f'{ep} = getelementptr inbounds {inner_ll}, {inner_ll}* {ptr}, i64 {new_len}')
+            self._emit_indent(f'{reg} = load {inner_ll}, {inner_ll}* {ep}')
+            self._emit_indent(f'store i64 {new_len}, i64* {lp}')
+            return reg
+
+        if method == "contains":
+            # Linear scan — emit a mini loop in IR
+            val      = args[0][0]
+            lp       = self._fresh("lp")
+            length   = self._fresh("len")
+            dp       = self._fresh("dp")
+            ptr      = self._fresh("ptr")
+            idx_a    = self._fresh("idx_a")
+            cond_lbl = self._label("cont_cond")
+            body_lbl = self._label("cont_body")
+            exit_lbl = self._label("cont_exit")
+            found_lbl= self._label("cont_found")
+            self._emit_indent(f'{lp} = getelementptr inbounds %{cname}, %{cname}* {obj_val}, i32 0, i32 0')
+            self._emit_indent(f'{length} = load i64, i64* {lp}')
+            self._emit_indent(f'{dp} = getelementptr inbounds %{cname}, %{cname}* {obj_val}, i32 0, i32 1')
+            self._emit_indent(f'{ptr} = load {inner_ll}*, {inner_ll}** {dp}')
+            self._emit_indent(f'{idx_a} = alloca i64')
+            self._emit_indent(f'store i64 0, i64* {idx_a}')
+            self._emit_indent(f'br label %{cond_lbl}')
+            self._emit(f'{cond_lbl}:')
+            cur = self._fresh("cur")
+            cmp = self._fresh("cmp")
+            self._emit_indent(f'{cur} = load i64, i64* {idx_a}')
+            self._emit_indent(f'{cmp} = icmp slt i64 {cur}, {length}')
+            self._emit_indent(f'br i1 {cmp}, label %{body_lbl}, label %{exit_lbl}')
+            self._emit(f'{body_lbl}:')
+            ep   = self._fresh("ep")
+            elem = self._fresh("elem")
+            eq   = self._fresh("eq")
+            nxt  = self._fresh("nxt")
+            self._emit_indent(f'{ep} = getelementptr inbounds {inner_ll}, {inner_ll}* {ptr}, i64 {cur}')
+            self._emit_indent(f'{elem} = load {inner_ll}, {inner_ll}* {ep}')
+            self._emit_indent(f'{eq} = icmp eq {inner_ll} {elem}, {val}')
+            self._emit_indent(f'{nxt} = add i64 {cur}, 1')
+            self._emit_indent(f'store i64 {nxt}, i64* {idx_a}')
+            self._emit_indent(f'br i1 {eq}, label %{found_lbl}, label %{cond_lbl}')
+            self._emit(f'{found_lbl}:')
+            self._emit_indent(f'br label %{exit_lbl}')
+            self._emit(f'{exit_lbl}:')
+            self._emit_indent(f'{reg} = phi i1 [ 0, %{cond_lbl} ], [ 1, %{found_lbl} ]')
+            return reg
+
         return "null"
 
     def _emit_text_builtin(self, target, method, args, reg):
