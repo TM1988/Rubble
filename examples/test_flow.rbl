@@ -1,0 +1,14 @@
+﻿slot x = 7
+if x > 10 {
+    write "big"
+} elif x > 5 {
+    write "medium"
+} else {
+    write "small"
+}
+slot i = 0
+loop i < 5 {
+    if i == 3 { jam }
+    write i
+    i = i + 1
+}

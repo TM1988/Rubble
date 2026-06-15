@@ -1,0 +1,4 @@
+﻿slot speed = 42
+slot ref = wire speed
+unwrap ref = 99
+write speed

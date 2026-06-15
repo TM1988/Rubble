@@ -1,0 +1,6 @@
+﻿slot n = smelt("123", unit)
+slot s = smelt(456, text)
+slot d = smelt(3, decimal)
+write n
+write s
+write d
