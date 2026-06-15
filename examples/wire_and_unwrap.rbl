@@ -1,0 +1,27 @@
+// Demonstrates wire (pointer/reference) and unwrap (dereference)
+
+slot speed = 42
+
+// Create a wire pointing at speed
+slot ref = wire speed
+
+write "speed before : " + smelt(speed, text)
+write "via wire     : " + smelt(unwrap ref, text)
+
+// Modify the original through the wire
+unwrap ref = 99
+
+write "speed after  : " + smelt(speed, text)
+write "via wire     : " + smelt(unwrap ref, text)
+
+// Wire to a blueprint field value (copy, not a live ref to the field)
+blueprint Box {
+    value: unit
+}
+
+slot b = build Box(value: 7)
+write "box.value : " + smelt(b.value, text)
+
+// Directly update blueprint field
+b.value = 50
+write "box.value after update : " + smelt(b.value, text)

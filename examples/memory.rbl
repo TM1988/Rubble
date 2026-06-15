@@ -1,0 +1,21 @@
+// Demonstrates scrap (deallocation), wreck (panic), and lock (constant)
+
+lock slot PI = 3.14159
+
+write "PI = " + smelt(PI, text)
+
+// Trying to reassign a locked slot would wreck at runtime:
+// PI = 99   <-- this would throw a runtime error
+
+// scrap removes a variable from memory
+slot temp = "I am temporary"
+write "temp before scrap: " + temp
+scrap temp
+// write temp   <-- this would throw 'undefined variable' after scrap
+
+write "temp has been scrapped"
+
+// wreck halts the program with a message — commented out so example runs fully
+// wreck "Something went fatally wrong!"
+
+write "Program completed without wreck"
