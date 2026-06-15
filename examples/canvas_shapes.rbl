@@ -1,0 +1,58 @@
+// Canvas shapes showcase — draws several primitives and displays them
+
+gather canvas
+gather math
+
+slot win = canvas.open("Rubble Canvas Showcase", 800, 600)
+
+// Dark background
+canvas.clear(win, 15, 15, 25)
+
+// Title text
+canvas.text(win, 20, 20, "Rubble Canvas Showcase", 255, 220, 50)
+
+// Row of circles with varying colors
+slot i = 0
+loop i < 8 {
+    slot cx = 60 + i * 90
+    slot r  = smelt(math.round(smelt(i, decimal) * 30.0), unit)
+    slot g  = smelt(math.round(200.0 - smelt(i, decimal) * 20.0), unit)
+    slot b  = smelt(math.round(50.0 + smelt(i, decimal) * 25.0), unit)
+    canvas.circle(win, cx, 120, 30, r, g, b)
+    i = i + 1
+}
+
+// Grid of rectangles
+slot row = 0
+loop row < 4 {
+    slot col = 0
+    loop col < 6 {
+        slot rx = 50 + col * 120
+        slot ry = 200 + row * 80
+        slot rr = smelt(math.round(40.0 + smelt(col, decimal) * 30.0), unit)
+        slot rg = smelt(math.round(40.0 + smelt(row, decimal) * 40.0), unit)
+        slot rb = 140
+        canvas.rect(win, rx, ry, 90, 60, rr, rg, rb)
+        col = col + 1
+    }
+    row = row + 1
+}
+
+// Diagonal lines
+slot li = 0
+loop li < 10 {
+    slot lx = li * 80
+    canvas.line(win, lx, 540, lx + 100, 580, 80, 200, 180)
+    li = li + 1
+}
+
+canvas.text(win, 20, 570, "Close window to exit", 120, 120, 120)
+canvas.show(win)
+
+// Wait for window close
+slot alive = canvas.poll(win)
+loop alive > 0 {
+    alive = canvas.poll(win)
+}
+
+canvas.close(win)

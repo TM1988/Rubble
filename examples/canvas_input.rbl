@@ -1,0 +1,44 @@
+// Canvas input demo — a red ball that moves with arrow keys
+// Key codes: Left=37, Right=39, Up=38, Down=40, Escape=27
+
+gather canvas
+gather math
+
+slot win = canvas.open("Rubble - Move the ball!", 640, 480)
+
+slot x = 320
+slot y = 240
+slot speed = 4
+slot running = 1
+
+loop running > 0 {
+    // Poll events — returns 0 if window was closed
+    running = canvas.poll(win)
+
+    // Exit on Escape key (keycode 27)
+    if canvas.key(win, 27) > 0 {
+        running = 0
+    }
+
+    // Move with arrow keys
+    if canvas.key(win, 37) > 0 { x = x - speed }  // Left
+    if canvas.key(win, 39) > 0 { x = x + speed }  // Right
+    if canvas.key(win, 38) > 0 { y = y - speed }  // Up
+    if canvas.key(win, 40) > 0 { y = y + speed }  // Down
+
+    // Clamp to window bounds
+    slot xd = smelt(x, decimal)
+    slot yd = smelt(y, decimal)
+    xd = math.clamp(xd, 20.0, 620.0)
+    yd = math.clamp(yd, 20.0, 460.0)
+    x = smelt(xd, unit)
+    y = smelt(yd, unit)
+
+    // Draw frame
+    canvas.clear(win, 20, 20, 40)
+    canvas.circle(win, x, y, 20, 220, 60, 60)
+    canvas.text(win, 10, 10, "Arrow keys to move, Escape to quit", 180, 180, 180)
+    canvas.show(win)
+}
+
+canvas.close(win)
