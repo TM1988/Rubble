@@ -140,8 +140,8 @@ class CodeGen:
 
     def _emit_prelude(self):
         self._emit(f'; Rubble compiled output — {self.filename}')
+        # Use a generic datalayout; clang will override with the host triple
         self._emit('target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"')
-        self._emit('target triple = "x86_64-pc-linux-gnu"')
         self._emit('')
 
     def _emit_postlude(self):
@@ -173,7 +173,8 @@ class CodeGen:
         self._emit('declare void @exit(i32) noreturn')
         self._emit('declare void @abort() noreturn')
         # Sleep
-        self._emit('declare i32 @usleep(i32)')
+        self._emit('declare i32 @rubble_machinery_rest(i64)')
+        self._emit('declare void @Sleep(i32)')
         # Rubble stdlib stubs (implemented in rubble_stdlib.c)
         self._emit('declare i8* @rubble_panel_prompt(i8*)')
         self._emit('declare i8* @rubble_panel_grab()')

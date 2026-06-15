@@ -80,7 +80,7 @@ def main():
         return
 
     # ── Try to compile to native binary via clang ─────────────────────────
-    clang = shutil.which("clang")
+    clang = shutil.which("clang") or _find_clang()
     if not clang:
         # No clang — fall back to IR and explain clearly
         with open(ll_out, "w", encoding="utf-8") as f:
@@ -102,7 +102,8 @@ def main():
         tmp_ll.write(ir.encode("utf-8"))
         tmp_ll.close()
 
-        cmd = [clang, tmp_ll.name, "-o", bin_out, "-lm"]
+        extra_flags = [] if sys.platform == "win32" else ["-lm"]
+        cmd = [clang, tmp_ll.name, "-o", bin_out] + extra_flags
         if os.path.exists(stdlib_c):
             cmd.insert(2, stdlib_c)
 
@@ -150,6 +151,18 @@ def _dedup_decls(ir: str) -> str:
             seen.add(stripped)
         out.append(line)
     return "\n".join(out)
+
+
+def _find_clang() -> str | None:
+    """Check known install locations for clang on Windows."""
+    candidates = [
+        r"C:\Program Files\LLVM\bin\clang.exe",
+        r"C:\Program Files (x86)\LLVM\bin\clang.exe",
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return None
 
 
 def _die(msg: str):
