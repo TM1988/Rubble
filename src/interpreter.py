@@ -485,7 +485,7 @@ class Interpreter:
         try:
             if t == "unit":    return int(value)
             if t == "decimal": return float(value)
-            if t == "text":    return str(value)
+            if t == "text":    return self._to_display(value)
             if t == "switch":  return bool(value)
         except (ValueError, TypeError) as e:
             raise RuntimeError_(f"smelt failed: cannot convert {value!r} to {t}: {e}")
