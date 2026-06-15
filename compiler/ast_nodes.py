@@ -166,6 +166,11 @@ class JamStmt(Node):
     loc: Loc
 
 @dataclass
+class SkipStmt(Node):
+    """skip — continue to next loop iteration"""
+    loc: Loc
+
+@dataclass
 class WreckStmt(Node):
     message: Node
     loc: Loc

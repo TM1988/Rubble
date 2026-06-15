@@ -105,7 +105,8 @@ class CodeGen:
 
         self._in_function = False
         self._current_func_name = ""
-        self._loop_exit_blocks: List[str] = []   # stack for jam
+        self._loop_exit_blocks: List[str] = []    # stack for jam
+        self._loop_cont_blocks: List[str] = []    # stack for skip
 
     def _fresh(self, prefix="tmp") -> str:
         self._counter += 1
@@ -369,6 +370,8 @@ class CodeGen:
             self._emit_yield(node)
         elif isinstance(node, JamStmt):
             self._emit_jam(node)
+        elif isinstance(node, SkipStmt):
+            self._emit_skip(node)
         elif isinstance(node, WreckStmt):
             self._emit_wreck(node)
         elif isinstance(node, ScrapStmt):
@@ -498,6 +501,12 @@ class CodeGen:
         dead = self._label("after_jam")
         self._emit(f'{dead}:')
 
+    def _emit_skip(self, node: SkipStmt):
+        if self._loop_cont_blocks:
+            self._emit_indent(f'br label %{self._loop_cont_blocks[-1]}')
+        dead = self._label("after_skip")
+        self._emit(f'{dead}:')
+
     def _emit_wreck(self, node: WreckStmt):
         msg = self._emit_expr(node.message)
         # Print the message then call exit(1)
@@ -562,6 +571,7 @@ class CodeGen:
         exit_lbl = self._label("loop_exit")
 
         self._loop_exit_blocks.append(exit_lbl)
+        self._loop_cont_blocks.append(cond_lbl)   # skip → re-evaluate condition
         self._emit_indent(f'br label %{cond_lbl}')
         self._emit(f'{cond_lbl}:')
         cond = self._emit_expr(node.condition)
@@ -571,6 +581,7 @@ class CodeGen:
         self._emit_indent(f'br label %{cond_lbl}')
         self._emit(f'{exit_lbl}:')
         self._loop_exit_blocks.pop()
+        self._loop_cont_blocks.pop()
 
     def _emit_foreach(self, node: ForEachStmt):
         it_val = self._emit_expr(node.iterable)
@@ -591,7 +602,9 @@ class CodeGen:
         cond_lbl = self._label("for_cond")
         body_lbl = self._label("for_body")
         exit_lbl = self._label("for_exit")
+        incr_lbl = self._label("for_incr")   # skip jumps here to increment then re-check
         self._loop_exit_blocks.append(exit_lbl)
+        self._loop_cont_blocks.append(incr_lbl)
 
         crate_type = f"%Crate_{inner_ll.replace('*','p').replace(' ','_')}"
         self._emit_indent(f'br label %{cond_lbl}')
@@ -627,6 +640,9 @@ class CodeGen:
 
         self._emit_block(node.body)
 
+        # Increment label (skip target)
+        self._emit_indent(f'br label %{incr_lbl}')
+        self._emit(f'{incr_lbl}:')
         # Increment index
         next_idx = self._fresh("next_idx")
         self._emit_indent(f'{next_idx} = add i64 {cur_idx}, 1')
@@ -634,6 +650,7 @@ class CodeGen:
         self._emit_indent(f'br label %{cond_lbl}')
         self._emit(f'{exit_lbl}:')
         self._loop_exit_blocks.pop()
+        self._loop_cont_blocks.pop()
         del self._locals[node.var]
 
     def _emit_block(self, stmts: List[Node]):

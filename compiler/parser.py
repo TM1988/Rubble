@@ -81,6 +81,9 @@ class Parser:
         if k == K.JAM:
             loc = self._loc(); self._adv(); self._match(K.SEMICOLON)
             return JamStmt(loc)
+        if k == K.SKIP:
+            loc = self._loc(); self._adv(); self._match(K.SEMICOLON)
+            return SkipStmt(loc)
         if k == K.WRECK:     return self._wreck()
         if k == K.SCRAP:     return self._scrap()
         if k == K.LOOP:      return self._loop()

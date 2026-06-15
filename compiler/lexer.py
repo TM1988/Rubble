@@ -27,6 +27,7 @@ class K:
     FOR        = "FOR"
     IN         = "IN"
     JAM        = "JAM"
+    SKIP       = "SKIP"
     WRECK      = "WRECK"
     SLOT       = "SLOT"
     LOCK       = "LOCK"
@@ -93,6 +94,7 @@ KEYWORDS = {
     "for":       K.FOR,
     "in":        K.IN,
     "jam":       K.JAM,
+    "skip":      K.SKIP,
     "wreck":     K.WRECK,
     "slot":      K.SLOT,
     "lock":      K.LOCK,

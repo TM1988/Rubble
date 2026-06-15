@@ -1,0 +1,18 @@
+// skip (continue) — should print 0 1 2 4 (skip 3)
+slot i = 0
+loop i < 5 {
+    i = i + 1
+    if i == 3 { skip }
+    write i
+}
+// 1 2 4 5
+
+// skip in for-in
+slot items = [10, 20, 30, 40, 50]
+for x in items {
+    if x == 30 { skip }
+    write x
+}
+// 10 20 40 50
+
+write "SKIP TESTS PASSED"
