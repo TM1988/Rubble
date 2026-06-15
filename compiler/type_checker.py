@@ -87,7 +87,7 @@ class TypeChecker:
     def _seed_stdlib(self):
         """Register standard library functions and objects in the global scope."""
         # Stdlib objects (gather makes them available, but also seed globally)
-        for name in ("panel", "cabinet", "machinery", "cable"):
+        for name in ("panel", "cabinet", "machinery", "cable", "canvas"):
             self.globals.define(name, TypeNode(name))
         # Direct function aliases
         self.globals.define("panel_prompt", T_TEXT)
@@ -391,6 +391,16 @@ class TypeChecker:
                 ("machinery","halt"):   T_EMPTY,
                 ("cable",    "connect"):T_UNIT,
                 ("cable",    "status"): T_SWITCH,
+                # canvas
+                ("canvas",   "open"):   T_UNIT,
+                ("canvas",   "clear"):  T_EMPTY,
+                ("canvas",   "rect"):   T_EMPTY,
+                ("canvas",   "circle"): T_EMPTY,
+                ("canvas",   "line"):   T_EMPTY,
+                ("canvas",   "text"):   T_EMPTY,
+                ("canvas",   "show"):   T_EMPTY,
+                ("canvas",   "poll"):   T_UNIT,
+                ("canvas",   "close"):  T_EMPTY,
             }
             # Check by object name
             if isinstance(node.callee.target, Ident):

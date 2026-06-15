@@ -124,6 +124,12 @@ def _compile(clang: str, ir: str, stdlib_c: str, out: str):
         cmd   = [clang, tmp_ll.name]
         if os.path.exists(stdlib_c):
             cmd.append(stdlib_c)
+        canvas_c = os.path.join(os.path.dirname(stdlib_c), "rubble_canvas.c")
+        if os.path.exists(canvas_c):
+            cmd.append(canvas_c)
+        # On Windows, canvas needs GDI and user32
+        if sys.platform == "win32":
+            cmd += ["-lgdi32", "-luser32"]
         cmd += ["-o", out] + extra
 
         result = subprocess.run(cmd, capture_output=True, text=True)

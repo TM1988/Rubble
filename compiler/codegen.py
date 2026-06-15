@@ -184,6 +184,17 @@ class CodeGen:
         self._emit('declare i64 @rubble_cable_connect(i8*, i64)')
         self._emit('declare i8* @rubble_line_read(i64)')
         self._emit('')
+        # canvas — windowed drawing surface
+        self._emit('declare i64 @rubble_canvas_open(i8*, i64, i64)')
+        self._emit('declare void @rubble_canvas_clear(i64, i64, i64, i64)')
+        self._emit('declare void @rubble_canvas_rect(i64, i64, i64, i64, i64, i64, i64, i64)')
+        self._emit('declare void @rubble_canvas_circle(i64, i64, i64, i64, i64, i64, i64)')
+        self._emit('declare void @rubble_canvas_line(i64, i64, i64, i64, i64, i64, i64, i64)')
+        self._emit('declare void @rubble_canvas_text(i64, i64, i64, i8*, i64, i64, i64)')
+        self._emit('declare void @rubble_canvas_show(i64)')
+        self._emit('declare i64  @rubble_canvas_poll(i64)')
+        self._emit('declare void @rubble_canvas_close(i64)')
+        self._emit('')
         # String conversion helpers
         self._emit('declare i64 @atoll(i8*)')
         self._emit('declare double @atof(i8*)')
@@ -896,12 +907,22 @@ class CodeGen:
         stdlib = {
             ("panel",    "prompt"):  ("rubble_panel_prompt",  "i8*",  ["i8*"]),
             ("panel",    "grab"):    ("rubble_panel_grab",    "i8*",  []),
-            ("machinery","rest"):    ("usleep",               "i32",  ["i32"]),
+            ("machinery","rest"):    ("rubble_machinery_rest","void", ["i64"]),
             ("machinery","ram"):     ("rubble_machinery_ram", "i64",  []),
             ("machinery","halt"):    ("exit",                 "void", ["i32"]),
             ("cabinet",  "open"):    ("rubble_cabinet_open",  "i64",  ["i8*"]),
             ("cabinet",  "create"):  ("rubble_cabinet_create","i64",  ["i8*"]),
             ("cable",    "connect"): ("rubble_cable_connect", "i64",  ["i8*", "i64"]),
+            # canvas
+            ("canvas",   "open"):    ("rubble_canvas_open",   "i64",  ["i8*", "i64", "i64"]),
+            ("canvas",   "clear"):   ("rubble_canvas_clear",  "void", ["i64", "i64", "i64", "i64"]),
+            ("canvas",   "rect"):    ("rubble_canvas_rect",   "void", ["i64","i64","i64","i64","i64","i64","i64","i64"]),
+            ("canvas",   "circle"):  ("rubble_canvas_circle", "void", ["i64","i64","i64","i64","i64","i64","i64"]),
+            ("canvas",   "line"):    ("rubble_canvas_line",   "void", ["i64","i64","i64","i64","i64","i64","i64","i64"]),
+            ("canvas",   "text"):    ("rubble_canvas_text",   "void", ["i64","i64","i64","i8*","i64","i64","i64"]),
+            ("canvas",   "show"):    ("rubble_canvas_show",   "void", ["i64"]),
+            ("canvas",   "poll"):    ("rubble_canvas_poll",   "i64",  ["i64"]),
+            ("canvas",   "close"):   ("rubble_canvas_close",  "void", ["i64"]),
         }
         key = (obj_name, method)
         if key in stdlib:

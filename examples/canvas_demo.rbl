@@ -1,0 +1,31 @@
+// Rubble canvas demo — opens a window, draws shapes, keeps it open
+
+gather canvas
+
+slot win = canvas.open("Rubble Canvas", 640, 480)
+
+// Clear to dark background
+canvas.clear(win, 30, 30, 30)
+
+// Draw a red rectangle
+canvas.rect(win, 50, 50, 200, 100, 220, 50, 50)
+
+// Draw a green circle
+canvas.circle(win, 400, 150, 80, 50, 200, 80)
+
+// Draw a blue line
+canvas.line(win, 50, 300, 600, 300, 80, 120, 220)
+
+// Draw some text
+canvas.text(win, 60, 400, "Hello from Rubble!", 255, 255, 255)
+
+// Show the frame
+canvas.show(win)
+
+// Keep the window open until the user closes it
+slot running = canvas.poll(win)
+loop running > 0 {
+    running = canvas.poll(win)
+}
+
+canvas.close(win)
