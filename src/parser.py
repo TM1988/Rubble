@@ -342,7 +342,15 @@ class Parser:
         while True:
             if self.check(TT["DOT"]):
                 self.advance()
-                field = self.expect(TT["IDENT"], "Expected field or method name").value
+                # Allow any token as a method/field name after a dot so that
+                # stdlib actions like .write(), .read(), .list(), .open(),
+                # .status() etc. are not rejected because they share a name
+                # with a Rubble keyword.
+                tok = self.current()
+                if tok.type == TT["EOF"]:
+                    self.error("Expected field or method name after '.'")
+                field = tok.value
+                self.advance()
                 if self.check(TT["LPAREN"]):
                     self.advance()
                     args = self.parse_arg_list()
