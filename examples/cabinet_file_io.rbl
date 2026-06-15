@@ -1,0 +1,27 @@
+// Demonstrates cabinet (file system) library
+// Creates a file, writes to it, then reads it back
+
+gather cabinet
+
+// Create a new file and write to it
+slot outfile = cabinet.create("examples/test_output.txt")
+outfile.write("Line one from Rubble\n")
+outfile.write("Line two from Rubble\n")
+outfile.close()
+
+write "File written."
+
+// Open it back and read contents
+slot infile = cabinet.open("examples/test_output.txt")
+slot contents = infile.read()
+infile.close()
+
+write "File contents:"
+write contents
+
+// List files in the examples folder
+slot files = cabinet.list("examples")
+write "Files in examples/:"
+for f in files {
+    write "  " + f
+}

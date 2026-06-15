@@ -1,0 +1,18 @@
+// Demonstrates panel (user input) library
+// Run interactively: python -m src examples/panel_input.rbl
+
+gather panel
+
+slot name = panel.prompt("Enter your name: ")
+write "Hello, " + name + "!"
+
+slot age_text = panel.prompt("Enter your age: ")
+slot age = smelt(age_text, unit)
+
+if age >= 18 {
+    write "You are an adult."
+} else {
+    write "You are a minor."
+}
+
+write "Thanks for using Rubble's panel library."

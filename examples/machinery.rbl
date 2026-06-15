@@ -1,0 +1,16 @@
+// Demonstrates machinery (OS/hardware) library
+
+gather machinery
+
+write "Checking available RAM..."
+slot mem = machinery.ram()
+write "Available RAM (bytes): " + smelt(mem, text)
+
+write "Pausing for 1 second..."
+machinery.rest(1)
+write "Back awake."
+
+// machinery.halt() would exit the program — commented out
+// machinery.halt()
+
+write "Machinery example done."
