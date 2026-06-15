@@ -1,64 +1,61 @@
 """
-rubblec — Rubble Compiler CLI
+rubble — Rubble Compiler
 Usage:
-    python -m compiler <file.rbl> [options]
+    rubble <file.rbl>               Compile to native binary (requires clang)
+    rubble <file.rbl> --check       Type-check only
+    rubble <file.rbl> --emit-ir     Keep the intermediate .ll file
+    rubble <file.rbl> -o <name>     Set output binary name
 
-Options:
-    --emit-ir       Stop after emitting LLVM IR (.ll file)  [default]
-    --emit-asm      Emit native assembly (.s) via llc
-    --build         Compile to native binary via clang
-    -o <output>     Output file name (default: same as input, different extension)
-    --check         Type-check only, no codegen
+If clang is not installed, emits a .ll (LLVM IR) file and tells you how to get clang.
 """
 
 import sys
 import os
 import subprocess
+import shutil
 import argparse
+import tempfile
 
 
 def main():
     ap = argparse.ArgumentParser(
-        prog="rubblec",
-        description="Rubble compiler — emits LLVM IR and optionally native binaries"
+        prog="rubble",
+        description="Rubble compiler",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Example:\n  rubble main.rbl\n  rubble main.rbl -o myapp"
     )
-    ap.add_argument("file", help="Source .rbl file")
-    ap.add_argument("--emit-ir",  action="store_true", default=True,
-                    help="Emit LLVM IR .ll file (default)")
-    ap.add_argument("--emit-asm", action="store_true",
-                    help="Emit native assembly via llc")
-    ap.add_argument("--build",    action="store_true",
-                    help="Compile to native binary via clang")
-    ap.add_argument("--check",    action="store_true",
-                    help="Type-check only, no output files")
-    ap.add_argument("-o", dest="output", default=None,
-                    help="Output file name")
+    ap.add_argument("file",      help="Source .rbl file to compile")
+    ap.add_argument("-o",        dest="output", default=None, help="Output binary name")
+    ap.add_argument("--check",   action="store_true", help="Type-check only, no output")
+    ap.add_argument("--emit-ir", action="store_true", help="Keep the .ll IR file instead of compiling to binary")
     args = ap.parse_args()
 
-    src_path = args.file
-    if not os.path.exists(src_path):
-        _die(f"File not found: {src_path!r}")
+    src = args.file
+    if not os.path.exists(src):
+        _die(f"File not found: {src!r}")
 
-    with open(src_path, 'r', encoding='utf-8') as f:
+    base     = os.path.splitext(src)[0]
+    bin_out  = args.output or base + (".exe" if sys.platform == "win32" else "")
+    ll_out   = base + ".ll"
+
+    # ── Lex ──────────────────────────────────────────────────────────────
+    with open(src, "r", encoding="utf-8") as f:
         source = f.read()
 
-    base = os.path.splitext(src_path)[0]
-
-    # --- Lex ---
     from .lexer import Lexer, LexError
     try:
-        tokens = Lexer(source, filename=src_path).tokenize()
+        tokens = Lexer(source, filename=src).tokenize()
     except LexError as e:
         _die(str(e))
 
-    # --- Parse ---
+    # ── Parse ─────────────────────────────────────────────────────────────
     from .parser import Parser, ParseError
     try:
         ast = Parser(tokens).parse()
     except ParseError as e:
         _die(str(e))
 
-    # --- Type check ---
+    # ── Type check ────────────────────────────────────────────────────────
     from .type_checker import TypeChecker, TypeError_
     tc = TypeChecker()
     try:
@@ -67,84 +64,96 @@ def main():
         _die(str(e))
 
     if args.check:
-        print(f"[rubblec] Type check passed: {src_path}")
+        print(f"OK  {src}")
         return
 
-    # --- Codegen ---
+    # ── Codegen → LLVM IR ─────────────────────────────────────────────────
     from .codegen import CodeGen
-    cg = CodeGen(filename=src_path)
+    cg  = CodeGen(filename=src)
+    ir  = _finalize_ir(cg, ast)
 
-    # Inject crate type defs before emitting
-    ir = _finalize_ir(cg, ast)
+    if args.emit_ir:
+        # User explicitly asked to keep the IR
+        with open(ll_out, "w", encoding="utf-8") as f:
+            f.write(ir)
+        print(f"IR  →  {ll_out}")
+        return
 
-    ll_path = args.output if (args.output and not args.emit_asm and not args.build) else base + ".ll"
-    with open(ll_path, 'w', encoding='utf-8') as f:
-        f.write(ir)
-    print(f"[rubblec] IR  -> {ll_path}")
+    # ── Try to compile to native binary via clang ─────────────────────────
+    clang = shutil.which("clang")
+    if not clang:
+        # No clang — fall back to IR and explain clearly
+        with open(ll_out, "w", encoding="utf-8") as f:
+            f.write(ir)
+        print(f"")
+        print(f"  Rubble compiled {src}  →  {ll_out}")
+        print(f"")
+        print(f"  To get a runnable binary, install clang:")
+        print(f"    Windows : https://github.com/llvm/llvm-project/releases")
+        print(f"              (download LLVM-x.x.x-win64.exe, tick 'Add to PATH')")
+        print(f"    Then run:  rubble {src}")
+        print(f"")
+        return
 
-    if args.emit_asm:
-        s_path = args.output if args.output else base + ".s"
-        _run(["llc", "-filetype=asm", ll_path, "-o", s_path])
-        print(f"[rubblec] ASM -> {s_path}")
+    # Write IR to a temp file, compile, clean up
+    stdlib_c = os.path.join(os.path.dirname(__file__), "..", "runtime", "rubble_stdlib.c")
+    tmp_ll   = tempfile.NamedTemporaryFile(suffix=".ll", delete=False)
+    try:
+        tmp_ll.write(ir.encode("utf-8"))
+        tmp_ll.close()
 
-    if args.build:
-        stdlib_c = os.path.join(os.path.dirname(__file__), "..", "runtime", "rubble_stdlib.c")
-        bin_path = args.output if args.output else base
-        if not os.path.exists(stdlib_c):
-            print(f"[rubblec] Warning: runtime/rubble_stdlib.c not found — linking without stdlib")
-            _run(["clang", ll_path, "-o", bin_path, "-lm"])
-        else:
-            _run(["clang", ll_path, stdlib_c, "-o", bin_path, "-lm"])
-        print(f"[rubblec] BIN -> {bin_path}")
+        cmd = [clang, tmp_ll.name, "-o", bin_out, "-lm"]
+        if os.path.exists(stdlib_c):
+            cmd.insert(2, stdlib_c)
 
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(result.stderr, file=sys.stderr)
+            _die(f"clang failed to compile {src}")
+
+        print(f"  →  {bin_out}")
+    finally:
+        os.unlink(tmp_ll.name)
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────
 
 def _finalize_ir(cg, ast) -> str:
-    """Run codegen and inject crate struct types into the output."""
     ir = cg.generate(ast)
+
+    # Inject crate struct types after the target triple
     crate_defs = cg._emit_crate_type_defs()
     if crate_defs:
-        # Insert after the target triple line
-        lines = ir.split('\n')
-        insert_at = 3  # after target triple
+        lines = ir.split("\n")
         for defn in reversed(crate_defs):
-            lines.insert(insert_at, defn)
-        ir = '\n'.join(lines)
-    # Also add sprintf declaration if needed
+            lines.insert(3, defn)
+        ir = "\n".join(lines)
+
+    # Add sprintf declaration if used but not declared
     if "sprintf" in ir and "declare i32 @sprintf" not in ir:
         ir = ir.replace(
             "declare i32 @printf(i8*, ...)",
             "declare i32 @printf(i8*, ...)\ndeclare i32 @sprintf(i8*, i8*, ...)"
         )
-    # Add atoll / atof if needed (deduplicate inline decls)
-    ir = _dedup_decls(ir)
-    return ir
+
+    return _dedup_decls(ir)
 
 
 def _dedup_decls(ir: str) -> str:
-    """Remove duplicate declare lines that codegen may emit inline."""
     seen = set()
-    out = []
-    for line in ir.split('\n'):
+    out  = []
+    for line in ir.split("\n"):
         stripped = line.strip()
         if stripped.startswith("declare "):
             if stripped in seen:
                 continue
             seen.add(stripped)
         out.append(line)
-    return '\n'.join(out)
-
-
-def _run(cmd):
-    try:
-        subprocess.run(cmd, check=True)
-    except FileNotFoundError:
-        _die(f"Command not found: {cmd[0]!r} — is LLVM/clang installed?")
-    except subprocess.CalledProcessError as e:
-        _die(f"Command failed: {' '.join(cmd)}")
+    return "\n".join(out)
 
 
 def _die(msg: str):
-    print(f"[rubblec] Error: {msg}", file=sys.stderr)
+    print(f"error: {msg}", file=sys.stderr)
     sys.exit(1)
 
 
