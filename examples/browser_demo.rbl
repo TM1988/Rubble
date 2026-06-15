@@ -1,0 +1,34 @@
+// Rubble Browser Demo — from the spec sheet
+// Demonstrates: gather, recipe, slot, loop, if, wire, write, wreck, yield
+
+gather panel
+gather cabinet
+gather cable
+
+lock slot default_site = "https://rubble-lang.org"
+
+recipe start_browser() -> switch {
+    write "Initializing Rubble Browser..."
+    slot url = panel.prompt("Enter address: ")
+    slot is_connected = false
+
+    if url == "" {
+        url = default_site
+    }
+
+    slot conn = cable.connect(url, 80)
+
+    loop flip is_connected {
+        if conn == 0 {
+            wreck "Network line severed. Connection failed."
+        } elif conn > 0 {
+            is_connected = true
+        } else {
+            wreck "Unknown connection error."
+        }
+    }
+
+    slot web_data = conn.read()
+    write web_data
+    yield is_connected
+}

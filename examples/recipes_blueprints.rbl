@@ -1,0 +1,34 @@
+// Recipes and Blueprints demo
+
+blueprint Point {
+    x: decimal,
+    y: decimal
+}
+
+recipe add(a: unit, b: unit) -> unit {
+    yield a + b
+}
+
+recipe greet(name: text) -> text {
+    yield "Hello, " + name + "!"
+}
+
+recipe factorial(n: unit) -> unit {
+    if n <= 1 {
+        yield 1
+    }
+    yield n * factorial(n - 1)
+}
+
+slot result = add(10, 32)
+write result
+
+slot msg = greet("Rubble")
+write msg
+
+slot fact = factorial(6)
+write fact
+
+slot p = build Point(x: 3.0, y: 4.0)
+write p.x
+write p.y

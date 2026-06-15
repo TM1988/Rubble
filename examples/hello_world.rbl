@@ -1,0 +1,3 @@
+// Hello World in Rubble (LLVM compiler)
+
+write "Hello, World!"
