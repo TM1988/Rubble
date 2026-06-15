@@ -173,6 +173,66 @@ slot data = conn.read()
 
 ---
 
+## Math Library
+
+```rubble
+gather math
+
+slot pi  = math.pi()              // 3.141593
+slot e   = math.e()               // 2.718282
+
+math.sqrt(x)      math.cbrt(x)     math.pow(base, exp)
+math.abs(x)       math.floor(x)    math.ceil(x)    math.round(x)
+math.sin(x)       math.cos(x)      math.tan(x)
+math.asin(x)      math.acos(x)     math.atan(x)    math.atan2(y, x)
+math.log(x)       math.log2(x)     math.log10(x)   math.exp(x)
+math.min(a, b)    math.max(a, b)
+math.clamp(val, lo, hi)
+math.lerp(a, b, t)
+```
+
+---
+
+## Canvas Library (UI / Graphics)
+
+```rubble
+gather canvas
+
+slot win = canvas.open("My Window", 800, 600)
+
+// Drawing
+canvas.clear(win, r, g, b)
+canvas.rect(win, x, y, w, h, r, g, b)
+canvas.circle(win, cx, cy, radius, r, g, b)
+canvas.line(win, x1, y1, x2, y2, r, g, b)
+canvas.text(win, x, y, "Hello", r, g, b)
+canvas.show(win)           // flush frame to screen
+
+// Event loop
+slot alive = canvas.poll(win)
+loop alive > 0 {
+    alive = canvas.poll(win)
+}
+canvas.close(win)
+
+// Keyboard input (Windows Virtual Key codes)
+canvas.key(win, 37)        // Left arrow held?  returns unit (1/0)
+canvas.key(win, 39)        // Right arrow
+canvas.key(win, 38)        // Up arrow
+canvas.key(win, 40)        // Down arrow
+canvas.key(win, 27)        // Escape
+canvas.key(win, 32)        // Space
+
+// Mouse input
+canvas.mouse_x(win)        // cursor X position
+canvas.mouse_y(win)        // cursor Y position
+canvas.mouse_btn(win, 0)   // left button (1/0)
+canvas.mouse_btn(win, 1)   // right button
+canvas.mouse_btn(win, 2)   // middle button
+```
+
+---
+
 ## Building a Native Binary
 
 ```bash
@@ -195,6 +255,17 @@ clang examples/hello_world.ll runtime/rubble_stdlib.c -o hello -lm
 | `examples/hello_world.rbl` | Basic output |
 | `examples/recipes_blueprints.rbl` | Functions, structs, recursion |
 | `examples/browser_demo.rbl` | Stdlib, recipes, gather, loop |
+| `examples/canvas_demo.rbl` | Canvas window, drawing primitives |
+| `examples/canvas_shapes.rbl` | Canvas showcase — circles, rects, lines, text |
+| `examples/canvas_input.rbl` | Interactive — arrow key ball movement |
+
+## Tests
+
+| File | Covers |
+|------|--------|
+| `tests/test_all.rbl` | All core language features |
+| `tests/test_crate.rbl` | Crate (array) operations |
+| `tests/test_math.rbl` | Math stdlib |
 
 ---
 
