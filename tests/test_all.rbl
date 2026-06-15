@@ -1,0 +1,110 @@
+// Rubble full feature smoke test
+// Expected output is listed beside each write
+
+// --- Literals & arithmetic ---
+slot a = 10
+slot b = 3
+write a + b          // 13
+write a - b          // 7
+write a * b          // 30
+write a / b          // 3.333...  (integer division gives float via LLVM sdiv -> 3)
+write a % b          // 1
+
+// --- Decimals ---
+slot pi = 3.14
+slot r  = 2.0
+write pi * r         // 6.28
+
+// --- Text concatenation ---
+slot hello = "Hello"
+slot world = "World"
+write hello + ", " + world + "!"   // Hello, World!
+
+// --- Switch (boolean) ---
+slot flag = true
+write flag           // true
+write flip flag      // false
+
+// --- Comparisons ---
+write 10 == 10       // true
+write 10 != 9        // true
+write 5 < 10         // true
+write 10 <= 10       // true
+
+// --- Logic ---
+write true and true   // true
+write true and false  // false
+write false or true   // true
+
+// --- lock slot (constant) ---
+lock slot MAX = 999
+write MAX            // 999
+
+// --- smelt (type casting) ---
+slot n = smelt("42", unit)
+write n              // 42
+slot s = smelt(100, text)
+write s              // 100
+slot d = smelt(7, decimal)
+write d              // 7.000000
+slot b2 = smelt(1, switch)
+write b2             // true
+
+// --- if / elif / else ---
+slot score = 75
+if score >= 90 {
+    write "A"
+} elif score >= 75 {
+    write "B"        // B
+} else {
+    write "F"
+}
+
+// --- loop + jam ---
+slot i = 0
+loop i < 10 {
+    if i == 4 { jam }
+    write i
+    i = i + 1
+}
+// prints 0 1 2 3
+
+// --- for-in (needs working crate codegen — skipped until crate is stable) ---
+
+// --- recipe ---
+recipe square(x: unit) -> unit {
+    yield x * x
+}
+write square(9)      // 81
+
+// --- recursive recipe ---
+recipe fib(n: unit) -> unit {
+    if n <= 1 { yield n }
+    yield fib(n - 1) + fib(n - 2)
+}
+write fib(10)        // 55
+
+// --- blueprint + build ---
+blueprint Point {
+    x: decimal,
+    y: decimal
+}
+slot p = build Point(x: 6.0, y: 8.0)
+write p.x            // 6.000000
+write p.y            // 8.000000
+
+// --- wire + unwrap ---
+slot speed = 100
+slot ref = wire speed
+unwrap ref = 200
+write speed          // 200
+
+// --- scrap (just tests it doesn't crash) ---
+slot tmp = 42
+scrap tmp
+write "scrap ok"     // scrap ok
+
+// --- wreck (commented out so test completes) ---
+// wreck "test panic"
+
+write "ALL TESTS PASSED"

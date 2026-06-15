@@ -145,6 +145,9 @@ class LexError(Exception):
 
 class Lexer:
     def __init__(self, source: str, filename: str = "<input>"):
+        # Strip UTF-8 BOM if present (written by some editors/tools on Windows)
+        if source.startswith('\ufeff'):
+            source = source[1:]
         self.src = source
         self.filename = filename
         self.pos = 0

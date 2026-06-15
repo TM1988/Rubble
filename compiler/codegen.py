@@ -184,6 +184,10 @@ class CodeGen:
         self._emit('declare i64 @rubble_cable_connect(i8*, i64)')
         self._emit('declare i8* @rubble_line_read(i64)')
         self._emit('')
+        # String conversion helpers
+        self._emit('declare i64 @atoll(i8*)')
+        self._emit('declare double @atof(i8*)')
+        self._emit('')
 
     def _collect_blueprints(self, program: Program):
         for s in program.stmts:
@@ -813,11 +817,9 @@ class CodeGen:
             reg = buf
         # text -> unit
         elif src_t.name == "text" and dst_t.name == "unit":
-            self._emit_indent(f'declare i64 @atoll(i8*)')
             self._emit_indent(f'{reg} = call i64 @atoll(i8* {src})')
         # text -> decimal
         elif src_t.name == "text" and dst_t.name == "decimal":
-            self._emit_indent(f'declare double @atof(i8*)')
             self._emit_indent(f'{reg} = call double @atof(i8* {src})')
         else:
             reg = src  # identity
