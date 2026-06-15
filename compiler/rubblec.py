@@ -1,12 +1,10 @@
 """
-rubble — Rubble Compiler
+rubble — Rubble language
 Usage:
-    rubble <file.rbl>               Compile to native binary (requires clang)
-    rubble <file.rbl> --check       Type-check only
-    rubble <file.rbl> --emit-ir     Keep the intermediate .ll file
-    rubble <file.rbl> -o <name>     Set output binary name
-
-If clang is not installed, emits a .ll (LLVM IR) file and tells you how to get clang.
+    rubble main.rbl              Run immediately (compile-and-run, no files left behind)
+    rubble main.rbl -o app       Produce a persistent binary called 'app'
+    rubble main.rbl --check      Type-check only
+    rubble main.rbl --emit-ir    Save the LLVM IR to a .ll file instead of running
 """
 
 import sys
@@ -20,23 +18,20 @@ import tempfile
 def main():
     ap = argparse.ArgumentParser(
         prog="rubble",
-        description="Rubble compiler",
+        description="Rubble language — runs .rbl files like a scripting language",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="Example:\n  rubble main.rbl\n  rubble main.rbl -o myapp"
+        epilog="Examples:\n  rubble main.rbl\n  rubble main.rbl -o myapp"
     )
-    ap.add_argument("file",      help="Source .rbl file to compile")
-    ap.add_argument("-o",        dest="output", default=None, help="Output binary name")
-    ap.add_argument("--check",   action="store_true", help="Type-check only, no output")
-    ap.add_argument("--emit-ir", action="store_true", help="Keep the .ll IR file instead of compiling to binary")
+    ap.add_argument("file",       help="Source .rbl file")
+    ap.add_argument("-o",         dest="output", default=None,
+                    help="Save a persistent binary with this name instead of run-and-delete")
+    ap.add_argument("--check",    action="store_true", help="Type-check only, no output")
+    ap.add_argument("--emit-ir",  action="store_true", help="Save LLVM IR (.ll) and exit")
     args = ap.parse_args()
 
     src = args.file
     if not os.path.exists(src):
         _die(f"File not found: {src!r}")
-
-    base     = os.path.splitext(src)[0]
-    bin_out  = args.output or base + (".exe" if sys.platform == "win32" else "")
-    ll_out   = base + ".ll"
 
     # ── Lex ──────────────────────────────────────────────────────────────
     with open(src, "r", encoding="utf-8") as f:
@@ -69,60 +64,91 @@ def main():
 
     # ── Codegen → LLVM IR ─────────────────────────────────────────────────
     from .codegen import CodeGen
-    cg  = CodeGen(filename=src)
-    ir  = _finalize_ir(cg, ast)
+    cg = CodeGen(filename=src)
+    ir = _finalize_ir(cg, ast)
 
+    # ── --emit-ir: just save the .ll and stop ─────────────────────────────
     if args.emit_ir:
-        # User explicitly asked to keep the IR
+        ll_out = os.path.splitext(src)[0] + ".ll"
         with open(ll_out, "w", encoding="utf-8") as f:
             f.write(ir)
         print(f"IR  →  {ll_out}")
         return
 
-    # ── Try to compile to native binary via clang ─────────────────────────
+    # ── Find clang ────────────────────────────────────────────────────────
     clang = shutil.which("clang") or _find_clang()
     if not clang:
-        # No clang — fall back to IR and explain clearly
+        ll_out = os.path.splitext(src)[0] + ".ll"
         with open(ll_out, "w", encoding="utf-8") as f:
             f.write(ir)
-        print(f"")
-        print(f"  Rubble compiled {src}  →  {ll_out}")
-        print(f"")
-        print(f"  To get a runnable binary, install clang:")
-        print(f"    Windows : https://github.com/llvm/llvm-project/releases")
-        print(f"              (download LLVM-x.x.x-win64.exe, tick 'Add to PATH')")
-        print(f"    Then run:  rubble {src}")
-        print(f"")
-        return
+        _die(
+            f"clang not found — cannot compile to a runnable binary.\n"
+            f"  Install LLVM from: https://github.com/llvm/llvm-project/releases\n"
+            f"  (Windows: LLVM-x.x.x-win64.exe, tick 'Add to PATH')\n"
+            f"  IR saved to: {ll_out}"
+        )
 
-    # Write IR to a temp file, compile, clean up
     stdlib_c = os.path.join(os.path.dirname(__file__), "..", "runtime", "rubble_stdlib.c")
-    tmp_ll   = tempfile.NamedTemporaryFile(suffix=".ll", delete=False)
+
+    if args.output:
+        # ── Persistent binary: user asked for -o ──────────────────────────
+        _compile(clang, ir, stdlib_c, args.output)
+        print(f"  →  {args.output}")
+    else:
+        # ── Compile-and-run (JIT style) ───────────────────────────────────
+        # Compile to a temp binary, run it, delete it. Feels just like Python.
+        ext = ".exe" if sys.platform == "win32" else ""
+        tmp_bin = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
+        tmp_bin.close()
+        try:
+            _compile(clang, ir, stdlib_c, tmp_bin.name)
+            result = subprocess.run([tmp_bin.name])
+            sys.exit(result.returncode)
+        finally:
+            try:
+                os.unlink(tmp_bin.name)
+            except OSError:
+                pass
+
+
+# ── Compilation helper ────────────────────────────────────────────────────
+
+def _compile(clang: str, ir: str, stdlib_c: str, out: str):
+    """Write IR to a temp .ll, invoke clang, clean up the .ll."""
+    tmp_ll = tempfile.NamedTemporaryFile(suffix=".ll", delete=False, mode="w", encoding="utf-8")
     try:
-        tmp_ll.write(ir.encode("utf-8"))
+        tmp_ll.write(ir)
         tmp_ll.close()
 
-        extra_flags = [] if sys.platform == "win32" else ["-lm"]
-        cmd = [clang, tmp_ll.name, "-o", bin_out] + extra_flags
+        extra = [] if sys.platform == "win32" else ["-lm"]
+        cmd   = [clang, tmp_ll.name]
         if os.path.exists(stdlib_c):
-            cmd.insert(2, stdlib_c)
+            cmd.append(stdlib_c)
+        cmd += ["-o", out] + extra
 
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            print(result.stderr, file=sys.stderr)
-            _die(f"clang failed to compile {src}")
-
-        print(f"  →  {bin_out}")
+            # Show clang errors but strip the noisy target-triple warning
+            stderr = "\n".join(
+                l for l in result.stderr.splitlines()
+                if "overriding the module target triple" not in l
+                and "warning generated" not in l
+            )
+            if stderr:
+                print(stderr, file=sys.stderr)
+            _die(f"Compilation failed")
     finally:
-        os.unlink(tmp_ll.name)
+        try:
+            os.unlink(tmp_ll.name)
+        except OSError:
+            pass
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────
+# ── IR post-processing ────────────────────────────────────────────────────
 
 def _finalize_ir(cg, ast) -> str:
     ir = cg.generate(ast)
 
-    # Inject crate struct types after the target triple
     crate_defs = cg._emit_crate_type_defs()
     if crate_defs:
         lines = ir.split("\n")
@@ -130,7 +156,6 @@ def _finalize_ir(cg, ast) -> str:
             lines.insert(3, defn)
         ir = "\n".join(lines)
 
-    # Add sprintf declaration if used but not declared
     if "sprintf" in ir and "declare i32 @sprintf" not in ir:
         ir = ir.replace(
             "declare i32 @printf(i8*, ...)",
@@ -141,27 +166,26 @@ def _finalize_ir(cg, ast) -> str:
 
 
 def _dedup_decls(ir: str) -> str:
-    seen = set()
-    out  = []
+    seen, out = set(), []
     for line in ir.split("\n"):
-        stripped = line.strip()
-        if stripped.startswith("declare "):
-            if stripped in seen:
+        s = line.strip()
+        if s.startswith("declare "):
+            if s in seen:
                 continue
-            seen.add(stripped)
+            seen.add(s)
         out.append(line)
     return "\n".join(out)
 
 
-def _find_clang() -> str | None:
-    """Check known install locations for clang on Windows."""
+def _find_clang():
+    """Fallback: check known install locations even if not on PATH."""
     candidates = [
         r"C:\Program Files\LLVM\bin\clang.exe",
         r"C:\Program Files (x86)\LLVM\bin\clang.exe",
     ]
-    for path in candidates:
-        if os.path.exists(path):
-            return path
+    for p in candidates:
+        if os.path.exists(p):
+            return p
     return None
 
 
