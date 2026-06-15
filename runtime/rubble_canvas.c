@@ -29,14 +29,22 @@
 #include <windows.h>
 
 #define MAX_WINDOWS 16
+#define KEY_TABLE_SIZE 256
 
 typedef struct {
     HWND     hwnd;
-    HDC      hdc_back;   /* back-buffer DC */
+    HDC      hdc_back;
     HBITMAP  hbmp;
     int      width;
     int      height;
     int      alive;
+    /* Input state */
+    int      keys[KEY_TABLE_SIZE];   /* 1 = currently held down */
+    int      mouse_x;
+    int      mouse_y;
+    int      mouse_left;
+    int      mouse_right;
+    int      mouse_middle;
 } RblWindow;
 
 static RblWindow _wins[MAX_WINDOWS];
@@ -65,27 +73,49 @@ static void _ensure_init(void) {
 }
 
 static LRESULT CALLBACK _wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
+    /* Find the window slot */
+    RblWindow *w = NULL;
+    for (int i = 0; i < MAX_WINDOWS; i++) {
+        if (_wins[i].hwnd == hwnd) { w = &_wins[i]; break; }
+    }
+
     if (msg == WM_DESTROY || msg == WM_CLOSE) {
-        /* Mark window dead */
-        for (int i = 0; i < MAX_WINDOWS; i++) {
-            if (_wins[i].hwnd == hwnd) _wins[i].alive = 0;
-        }
+        if (w) w->alive = 0;
         PostQuitMessage(0);
         return 0;
     }
     if (msg == WM_PAINT) {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
-        for (int i = 0; i < MAX_WINDOWS; i++) {
-            if (_wins[i].hwnd == hwnd && _wins[i].hdc_back) {
-                BitBlt(hdc, 0, 0, _wins[i].width, _wins[i].height,
-                       _wins[i].hdc_back, 0, 0, SRCCOPY);
-                break;
-            }
+        if (w && w->hdc_back) {
+            BitBlt(hdc, 0, 0, w->width, w->height, w->hdc_back, 0, 0, SRCCOPY);
         }
         EndPaint(hwnd, &ps);
         return 0;
     }
+    /* Keyboard */
+    if (msg == WM_KEYDOWN && w) {
+        if (wp < KEY_TABLE_SIZE) w->keys[(int)wp] = 1;
+        return 0;
+    }
+    if (msg == WM_KEYUP && w) {
+        if (wp < KEY_TABLE_SIZE) w->keys[(int)wp] = 0;
+        return 0;
+    }
+    /* Mouse movement */
+    if (msg == WM_MOUSEMOVE && w) {
+        w->mouse_x = (int)LOWORD(lp);
+        w->mouse_y = (int)HIWORD(lp);
+        return 0;
+    }
+    /* Mouse buttons */
+    if (msg == WM_LBUTTONDOWN && w) { w->mouse_left   = 1; return 0; }
+    if (msg == WM_LBUTTONUP   && w) { w->mouse_left   = 0; return 0; }
+    if (msg == WM_RBUTTONDOWN && w) { w->mouse_right  = 1; return 0; }
+    if (msg == WM_RBUTTONUP   && w) { w->mouse_right  = 0; return 0; }
+    if (msg == WM_MBUTTONDOWN && w) { w->mouse_middle = 1; return 0; }
+    if (msg == WM_MBUTTONUP   && w) { w->mouse_middle = 0; return 0; }
+
     return DefWindowProcA(hwnd, msg, wp, lp);
 }
 
@@ -230,6 +260,41 @@ void rubble_canvas_close(int64_t handle) {
     w->alive = 0;
 }
 
+/* ── Input query functions ─────────────────────────────────────────────── */
+
+/* Returns 1 if the key with the given Windows Virtual Key code is held down.
+ * Common key codes:
+ *   65-90  = A-Z,  48-57 = 0-9
+ *   VK_LEFT=37, VK_RIGHT=39, VK_UP=38, VK_DOWN=40
+ *   VK_SPACE=32, VK_RETURN=13, VK_ESCAPE=27, VK_SHIFT=16, VK_CONTROL=17
+ */
+int64_t rubble_canvas_key(int64_t handle, int64_t keycode) {
+    RblWindow *w = _get(handle);
+    if (!w) return 0;
+    if (keycode < 0 || keycode >= KEY_TABLE_SIZE) return 0;
+    return w->keys[(int)keycode] ? 1 : 0;
+}
+
+int64_t rubble_canvas_mouse_x(int64_t handle) {
+    RblWindow *w = _get(handle);
+    return w ? (int64_t)w->mouse_x : 0;
+}
+
+int64_t rubble_canvas_mouse_y(int64_t handle) {
+    RblWindow *w = _get(handle);
+    return w ? (int64_t)w->mouse_y : 0;
+}
+
+/* btn: 0 = left, 1 = right, 2 = middle */
+int64_t rubble_canvas_mouse_btn(int64_t handle, int64_t btn) {
+    RblWindow *w = _get(handle);
+    if (!w) return 0;
+    if (btn == 0) return w->mouse_left;
+    if (btn == 1) return w->mouse_right;
+    if (btn == 2) return w->mouse_middle;
+    return 0;
+}
+
 /* =========================================================================
  * LINUX / X11 STUB (to be expanded later)
  * ========================================================================= */
@@ -247,5 +312,9 @@ void rubble_canvas_text(int64_t h, int64_t x, int64_t y, const char *msg, int64_
 void rubble_canvas_show(int64_t h) {}
 int64_t rubble_canvas_poll(int64_t h) { return 0; }
 void rubble_canvas_close(int64_t h) {}
+int64_t rubble_canvas_key(int64_t h, int64_t k) { return 0; }
+int64_t rubble_canvas_mouse_x(int64_t h) { return 0; }
+int64_t rubble_canvas_mouse_y(int64_t h) { return 0; }
+int64_t rubble_canvas_mouse_btn(int64_t h, int64_t b) { return 0; }
 
 #endif
