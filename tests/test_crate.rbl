@@ -1,0 +1,46 @@
+// Crate (array) feature tests
+
+// --- literal + length ---
+slot nums = [10, 20, 30, 40, 50]
+write nums.length()       // 5
+
+// --- get ---
+write nums.get(0)         // 10
+write nums.get(4)         // 50
+
+// --- set ---
+nums.set(2, 99)
+write nums.get(2)         // 99
+
+// --- push ---
+nums.push(60)
+write nums.length()       // 6
+write nums.get(5)         // 60
+
+// --- pop ---
+slot popped = nums.pop()
+write popped              // 60
+write nums.length()       // 5
+
+// --- contains ---
+write nums.contains(10)   // true
+write nums.contains(77)   // false
+
+// --- for-in loop ---
+slot total = 0
+slot items = [1, 2, 3, 4, 5]
+for item in items {
+    total = total + item
+}
+write total               // 15
+
+// --- crate of text ---
+slot names = ["Alice", "Bob", "Carol"]
+write names.length()      // 3
+write names.get(1)        // Bob
+for name in names {
+    write name
+}
+// Alice Bob Carol
+
+write "CRATE TESTS PASSED"

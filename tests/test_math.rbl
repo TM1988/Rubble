@@ -1,0 +1,27 @@
+// Math stdlib tests
+
+gather math
+
+slot pi = math.pi()
+write pi                          // 3.141592...
+
+slot e = math.e()
+write e                           // 2.718281...
+
+write math.sqrt(16.0)             // 4.000000
+write math.pow(2.0, 10.0)         // 1024.000000
+write math.abs(-7.5)              // 7.500000
+write math.floor(3.9)             // 3.000000
+write math.ceil(3.1)              // 4.000000
+write math.round(3.5)             // 4.000000
+write math.min(10.0, 3.0)         // 3.000000
+write math.max(10.0, 3.0)         // 10.000000
+write math.clamp(15.0, 0.0, 10.0) // 10.000000
+write math.lerp(0.0, 100.0, 0.25) // 25.000000
+
+// Trig — sin(pi/2) should be ~1.0
+slot half_pi = pi / 2.0
+write math.sin(half_pi)           // 1.000000
+write math.cos(0.0)               // 1.000000
+
+write "MATH TESTS PASSED"
