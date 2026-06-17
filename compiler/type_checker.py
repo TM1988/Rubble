@@ -9,7 +9,7 @@ from .ast_nodes import *
 
 
 # ---------------------------------------------------------------------------
-# Rubble type constants (as TypeNode instances for comparison)
+# Rubble type constants
 # ---------------------------------------------------------------------------
 
 T_UNIT    = TypeNode("unit")
@@ -41,7 +41,7 @@ def types_equal(a: TypeNode, b: TypeNode) -> bool:
 
 class Scope:
     def __init__(self, parent: Optional['Scope'] = None):
-        self._syms: Dict[str, Tuple[TypeNode, bool]] = {}  # name -> (type, is_locked)
+        self._syms: Dict[str, Tuple[TypeNode, bool]] = {}
         self.parent = parent
 
     def define(self, name: str, typ: TypeNode, locked: bool = False):
@@ -70,6 +70,94 @@ class TypeError_(Exception):
 
 
 # ---------------------------------------------------------------------------
+# All stdlib method return types — shared between checker and codegen
+# ---------------------------------------------------------------------------
+
+STDLIB_METHODS: Dict[Tuple[str, str], TypeNode] = {
+    # panel
+    ("panel",    "prompt"):          T_TEXT,
+    ("panel",    "grab"):            T_TEXT,
+    # cabinet
+    ("cabinet",  "list"):            t_crate(T_TEXT),
+    ("cabinet",  "open"):            T_UNIT,
+    ("cabinet",  "create"):          T_UNIT,
+    ("cabinet",  "read"):            T_TEXT,
+    ("cabinet",  "write"):           T_EMPTY,
+    ("cabinet",  "exists"):          T_SWITCH,
+    ("cabinet",  "delete"):          T_EMPTY,
+    # machinery
+    ("machinery","rest"):            T_EMPTY,
+    ("machinery","ram"):             T_UNIT,
+    ("machinery","halt"):            T_EMPTY,
+    ("machinery","time"):            T_UNIT,
+    ("machinery","args"):            t_crate(T_TEXT),
+    ("machinery","env"):             T_TEXT,
+    ("machinery","exit"):            T_EMPTY,
+    # cable
+    ("cable",    "connect"):         T_UNIT,
+    ("cable",    "status"):          T_SWITCH,
+    # canvas
+    ("canvas",   "open"):            T_UNIT,
+    ("canvas",   "clear"):           T_EMPTY,
+    ("canvas",   "rect"):            T_EMPTY,
+    ("canvas",   "circle"):          T_EMPTY,
+    ("canvas",   "line"):            T_EMPTY,
+    ("canvas",   "text"):            T_EMPTY,
+    ("canvas",   "show"):            T_EMPTY,
+    ("canvas",   "poll"):            T_UNIT,
+    ("canvas",   "close"):           T_EMPTY,
+    ("canvas",   "key"):             T_UNIT,
+    ("canvas",   "key_just_pressed"):T_SWITCH,
+    ("canvas",   "mouse_x"):         T_UNIT,
+    ("canvas",   "mouse_y"):         T_UNIT,
+    ("canvas",   "mouse_btn"):       T_UNIT,
+    ("canvas",   "mouse_scroll"):    T_UNIT,
+    ("canvas",   "fill_mode"):       T_EMPTY,
+    ("canvas",   "set_title"):       T_EMPTY,
+    ("canvas",   "resize"):          T_EMPTY,
+    ("canvas",   "fullscreen"):      T_EMPTY,
+    ("canvas",   "delta_time"):      T_DECIMAL,
+    ("canvas",   "image_load"):      T_UNIT,
+    ("canvas",   "image_draw"):      T_EMPTY,
+    ("canvas",   "font_size"):       T_EMPTY,
+    # math
+    ("math", "sqrt"):   T_DECIMAL, ("math", "cbrt"):  T_DECIMAL,
+    ("math", "pow"):    T_DECIMAL, ("math", "abs"):   T_DECIMAL,
+    ("math", "floor"):  T_DECIMAL, ("math", "ceil"):  T_DECIMAL,
+    ("math", "round"):  T_DECIMAL, ("math", "sin"):   T_DECIMAL,
+    ("math", "cos"):    T_DECIMAL, ("math", "tan"):   T_DECIMAL,
+    ("math", "asin"):   T_DECIMAL, ("math", "acos"):  T_DECIMAL,
+    ("math", "atan"):   T_DECIMAL, ("math", "atan2"): T_DECIMAL,
+    ("math", "log"):    T_DECIMAL, ("math", "log2"):  T_DECIMAL,
+    ("math", "log10"):  T_DECIMAL, ("math", "exp"):   T_DECIMAL,
+    ("math", "min"):    T_DECIMAL, ("math", "max"):   T_DECIMAL,
+    ("math", "pi"):     T_DECIMAL, ("math", "e"):     T_DECIMAL,
+    ("math", "inf"):    T_DECIMAL, ("math", "clamp"): T_DECIMAL,
+    ("math", "lerp"):   T_DECIMAL,
+    # rand
+    ("rand", "int"):      T_UNIT,
+    ("rand", "decimal"):  T_DECIMAL,
+    ("rand", "seed"):     T_EMPTY,
+    # time
+    ("time", "now"):      T_UNIT,
+    ("time", "format"):   T_TEXT,
+    ("time", "sleep"):    T_EMPTY,
+    # json
+    ("json", "encode"):   T_TEXT,
+    ("json", "decode"):   T_TEXT,
+    ("json", "get"):      T_TEXT,
+    ("json", "set"):      T_TEXT,
+    # sound
+    ("sound", "load"):    T_UNIT,
+    ("sound", "play"):    T_EMPTY,
+    ("sound", "stop"):    T_EMPTY,
+    # thread
+    ("thread", "spawn"):  T_UNIT,
+    ("thread", "join"):   T_EMPTY,
+}
+
+
+# ---------------------------------------------------------------------------
 # Type checker
 # ---------------------------------------------------------------------------
 
@@ -80,26 +168,22 @@ class TypeChecker:
         self._recipes: Dict[str, RecipeDecl] = {}
         self._current_return_type: Optional[TypeNode] = None
         self._gathered: set = set()
-
-        # Pre-seed stdlib signatures so the checker knows their types
         self._seed_stdlib()
 
     def _seed_stdlib(self):
-        """Register standard library functions and objects in the global scope."""
-        # Stdlib objects (gather makes them available, but also seed globally)
-        for name in ("panel", "cabinet", "machinery", "cable", "canvas", "math"):
+        for name in ("panel", "cabinet", "machinery", "cable", "canvas", "math",
+                     "rand", "time", "json", "sound", "thread"):
             self.globals.define(name, TypeNode(name))
-        # Direct function aliases
-        self.globals.define("panel_prompt", T_TEXT)
-        self.globals.define("panel_grab",   T_TEXT)
+        self.globals.define("panel_prompt",   T_TEXT)
+        self.globals.define("panel_grab",     T_TEXT)
         self.globals.define("cabinet_list",   t_crate(T_TEXT))
         self.globals.define("cabinet_open",   T_UNIT)
         self.globals.define("cabinet_create", T_UNIT)
-        self.globals.define("machinery_rest",  T_EMPTY)
-        self.globals.define("machinery_ram",   T_UNIT)
-        self.globals.define("machinery_halt",  T_EMPTY)
+        self.globals.define("machinery_rest", T_EMPTY)
+        self.globals.define("machinery_ram",  T_UNIT)
+        self.globals.define("machinery_halt", T_EMPTY)
         self.globals.define("cable_connect",  T_UNIT)
-        self.globals.define("line_read",       T_TEXT)
+        self.globals.define("line_read",      T_TEXT)
 
     def check(self, program: Program):
         self._scan_top_level(program.stmts)
@@ -107,17 +191,14 @@ class TypeChecker:
             self._check_stmt(stmt, self.globals)
 
     # ------------------------------------------------------------------
-    # Pre-scan: register all recipe and blueprint names first so
-    # forward calls and mutually recursive recipes are allowed.
+    # Pre-scan: register recipe and blueprint names for forward refs
     # ------------------------------------------------------------------
 
     def _scan_top_level(self, stmts: List[Node]):
         for stmt in stmts:
             if isinstance(stmt, RecipeDecl):
                 self._recipes[stmt.name] = stmt
-                # Build a function-type pseudo-record as a TypeNode
-                # We store the RecipeDecl directly for call checking
-                self.globals.define(stmt.name, T_EMPTY)  # placeholder; resolved on call
+                self.globals.define(stmt.name, T_EMPTY)
             elif isinstance(stmt, BlueprintDecl):
                 self._blueprints[stmt.name] = stmt
 
@@ -128,15 +209,13 @@ class TypeChecker:
     def _check_stmt(self, node: Node, scope: Scope):
         if isinstance(node, GatherStmt):
             self._gathered.add(node.module)
-            # Make stdlib objects available as identifiers in scope
-            stdlib_obj_types = {
-                "panel":    TypeNode("panel"),
-                "cabinet":  TypeNode("cabinet"),
-                "machinery":TypeNode("machinery"),
-                "cable":    TypeNode("cable"),
+            obj_map = {
+                "panel": "panel", "cabinet": "cabinet", "machinery": "machinery",
+                "cable": "cable", "rand": "rand", "time": "time",
+                "json": "json", "sound": "sound", "thread": "thread",
             }
-            if node.module in stdlib_obj_types:
-                scope.define(node.module, stdlib_obj_types[node.module])
+            if node.module in obj_map:
+                scope.define(node.module, TypeNode(obj_map[node.module]))
 
         elif isinstance(node, BlueprintDecl):
             self._blueprints[node.name] = node
@@ -174,7 +253,7 @@ class TypeChecker:
                         f"Wire points to {ptr_type.inner} but assigned {rhs_type}", node.loc)
 
         elif isinstance(node, WriteStmt):
-            self._infer(node.value, scope)   # any type is writable
+            self._infer(node.value, scope)
 
         elif isinstance(node, YieldStmt):
             if self._current_return_type is None:
@@ -205,6 +284,14 @@ class TypeChecker:
             if node.else_block:
                 self._check_block(node.else_block, scope)
 
+        elif isinstance(node, MatchStmt):
+            self._infer(node.value, scope)
+            for pat, body in node.arms:
+                self._infer(pat, scope)
+                self._check_block(body, scope)
+            if node.default_block:
+                self._check_block(node.default_block, scope)
+
         elif isinstance(node, LoopStmt):
             cond_t = self._infer(node.condition, scope)
             if not types_equal(cond_t, T_SWITCH):
@@ -223,15 +310,27 @@ class TypeChecker:
         elif isinstance(node, ExprStmt):
             self._infer(node.expr, scope)
 
-        elif isinstance(node, JamStmt):
-            pass   # no type check needed
+        elif isinstance(node, (JamStmt, SkipStmt)):
+            pass
 
     def _check_recipe(self, node: RecipeDecl):
         scope = Scope(parent=self.globals)
         for p in node.params:
-            scope.define(p.name, p.type_node)
+            if p.variadic:
+                scope.define(p.name, t_crate(p.type_node.inner or p.type_node))
+            else:
+                scope.define(p.name, p.type_node)
+            if p.default is not None:
+                dt = self._infer(p.default, self.globals)
+                if not types_equal(dt, p.type_node):
+                    raise TypeError_(
+                        f"Default value for '{p.name}' has type {dt}, expected {p.type_node}",
+                        node.loc)
         old_ret = self._current_return_type
-        self._current_return_type = node.return_type
+        if node.return_types:
+            self._current_return_type = TypeNode(f"__ret_{node.name}")
+        else:
+            self._current_return_type = node.return_type
         self._check_block(node.body, scope)
         self._current_return_type = old_ret
 
@@ -257,7 +356,6 @@ class TypeChecker:
     # ------------------------------------------------------------------
 
     def _infer(self, node: Node, scope: Scope) -> TypeNode:
-        """Infer the type of an expression and attach it as node.rtype."""
         t = self._infer_inner(node, scope)
         node.rtype = t
         return t
@@ -268,6 +366,12 @@ class TypeChecker:
         if isinstance(node, TextLit):    return T_TEXT
         if isinstance(node, SwitchLit):  return T_SWITCH
         if isinstance(node, EmptyLit):   return T_EMPTY
+
+        if isinstance(node, InterpTextLit):
+            for part in node.parts:
+                if isinstance(part, Node):
+                    self._infer(part, scope)
+            return T_TEXT
 
         if isinstance(node, CrateLit):
             if not node.elements:
@@ -338,18 +442,11 @@ class TypeChecker:
         lt = self._infer(node.left, scope)
         rt = self._infer(node.right, scope)
         op = node.op
-
-        # Logical
         if op in ("and", "or"):
             return T_SWITCH
-
-        # Comparison
         if op in ("==", "!=", "<", ">", "<=", ">="):
             return T_SWITCH
-
-        # Arithmetic
         if op in ("+", "-", "*", "/", "%"):
-            # text + anything => text concatenation
             if lt.name == "text" or rt.name == "text":
                 return T_TEXT
             if lt.name == "decimal" or rt.name == "decimal":
@@ -357,105 +454,58 @@ class TypeChecker:
             if lt.name == "unit" and rt.name == "unit":
                 return T_UNIT
             raise TypeError_(f"Cannot apply '{op}' to {lt} and {rt}", node.loc)
-
         raise TypeError_(f"Unknown operator '{op}'", node.loc)
 
     def _infer_field(self, node: FieldExpr, scope: Scope) -> TypeNode:
         obj_t = self._infer(node.target, scope)
-        # Blueprint field access
         if obj_t.name in self._blueprints:
             bp = self._blueprints[obj_t.name]
             for f in bp.fields:
                 if f.name == node.field:
                     return f.type_node
             raise TypeError_(f"Blueprint '{obj_t.name}' has no field '{node.field}'", node.loc)
-        # Stdlib object field access — treated as opaque text/unit for now
         return T_TEXT
 
     def _infer_call(self, node: CallExpr, scope: Scope) -> TypeNode:
-        # Method call: obj.method(args)
         if isinstance(node.callee, FieldExpr):
             obj_t = self._infer(node.callee.target, scope)
             method = node.callee.field
             for a in node.args:
                 self._infer(a, scope)
-            # Known stdlib return types
-            stdlib_methods = {
-                ("panel",    "prompt"): T_TEXT,
-                ("panel",    "grab"):   T_TEXT,
-                ("cabinet",  "list"):   t_crate(T_TEXT),
-                ("cabinet",  "open"):   T_UNIT,
-                ("cabinet",  "create"): T_UNIT,
-                ("machinery","rest"):   T_EMPTY,
-                ("machinery","ram"):    T_UNIT,
-                ("machinery","halt"):   T_EMPTY,
-                ("cable",    "connect"):T_UNIT,
-                ("cable",    "status"): T_SWITCH,
-                # canvas
-                ("canvas",   "open"):   T_UNIT,
-                ("canvas",   "clear"):  T_EMPTY,
-                ("canvas",   "rect"):   T_EMPTY,
-                ("canvas",   "circle"): T_EMPTY,
-                ("canvas",   "line"):   T_EMPTY,
-                ("canvas",   "text"):   T_EMPTY,
-                ("canvas",   "show"):   T_EMPTY,
-                ("canvas",   "poll"):   T_UNIT,
-                ("canvas",   "close"):  T_EMPTY,
-                # canvas input
-                ("canvas",   "key"):       T_UNIT,
-                ("canvas",   "mouse_x"):   T_UNIT,
-                ("canvas",   "mouse_y"):   T_UNIT,
-                ("canvas",   "mouse_btn"): T_UNIT,
-                # math
-                ("math", "sqrt"):  T_DECIMAL, ("math", "cbrt"):  T_DECIMAL,
-                ("math", "pow"):   T_DECIMAL, ("math", "abs"):   T_DECIMAL,
-                ("math", "floor"): T_DECIMAL, ("math", "ceil"):  T_DECIMAL,
-                ("math", "round"): T_DECIMAL, ("math", "sin"):   T_DECIMAL,
-                ("math", "cos"):   T_DECIMAL, ("math", "tan"):   T_DECIMAL,
-                ("math", "asin"):  T_DECIMAL, ("math", "acos"):  T_DECIMAL,
-                ("math", "atan"):  T_DECIMAL, ("math", "atan2"): T_DECIMAL,
-                ("math", "log"):   T_DECIMAL, ("math", "log2"):  T_DECIMAL,
-                ("math", "log10"): T_DECIMAL, ("math", "exp"):   T_DECIMAL,
-                ("math", "min"):   T_DECIMAL, ("math", "max"):   T_DECIMAL,
-                ("math", "pi"):    T_DECIMAL, ("math", "e"):     T_DECIMAL,
-                ("math", "inf"):   T_DECIMAL, ("math", "clamp"): T_DECIMAL,
-                ("math", "lerp"):  T_DECIMAL,
-            }
-            # Check by object name
             if isinstance(node.callee.target, Ident):
                 key = (node.callee.target.name, method)
-                if key in stdlib_methods:
-                    return stdlib_methods[key]
-            # Crate built-ins
+                if key in STDLIB_METHODS:
+                    return STDLIB_METHODS[key]
             if obj_t.name == "crate":
-                if method in ("push", "set"):    return T_EMPTY
-                if method == "pop":              return obj_t.inner or T_EMPTY
-                if method == "length":           return T_UNIT
-                if method == "get":              return obj_t.inner or T_EMPTY
-                if method == "contains":         return T_SWITCH
-            # Text built-ins
+                if method in ("push", "set", "sort", "reverse"): return T_EMPTY
+                if method == "pop":                               return obj_t.inner or T_EMPTY
+                if method in ("length", "index"):                 return T_UNIT
+                if method == "get":                               return obj_t.inner or T_EMPTY
+                if method == "contains":                          return T_SWITCH
+                if method == "slice":                             return obj_t
+                if method == "join":                              return T_TEXT
             if obj_t.name == "text":
-                if method in ("upper", "lower", "trim"): return T_TEXT
-                if method == "length":                   return T_UNIT
-                if method == "split":                    return t_crate(T_TEXT)
-                if method in ("contains", "starts", "ends"): return T_SWITCH
-            # FileStream / Connection methods
-            if method == "read":    return T_TEXT
-            if method == "write":   return T_EMPTY
-            if method == "close":   return T_EMPTY
-            if method == "status":  return T_SWITCH
-            # Unknown method — return empty (permissive for stdlib)
+                if method in ("upper", "lower", "trim", "replace", "slice"): return T_TEXT
+                if method == "length":                            return T_UNIT
+                if method == "index":                             return T_UNIT
+                if method == "split":                             return t_crate(T_TEXT)
+                if method in ("contains", "starts", "ends"):      return T_SWITCH
+            if method == "read":   return T_TEXT
+            if method == "write":  return T_EMPTY
+            if method == "close":  return T_EMPTY
+            if method == "status": return T_SWITCH
+            if method == "length": return T_UNIT
             return T_EMPTY
 
-        # Plain function call
         if isinstance(node.callee, Ident):
             name = node.callee.name
             if name in self._recipes:
                 decl = self._recipes[name]
                 for a in node.args:
                     self._infer(a, scope)
+                if decl.return_types:
+                    return TypeNode(f"__ret_{name}")
                 return decl.return_type
-            # Stdlib direct call
             entry = scope.lookup(name)
             if entry:
                 return entry[0]

@@ -1,0 +1,36 @@
+{
+  "name": "rubble-language",
+  "displayName": "Rubble",
+  "description": "Syntax highlighting for the Rubble programming language (.rbl files)",
+  "version": "0.2.0",
+  "publisher": "rubble",
+  "engines": { "vscode": "^1.60.0" },
+  "categories": ["Programming Languages"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rubble-lang/rubble"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "rubble",
+        "aliases": ["Rubble", "rbl"],
+        "extensions": [".rbl"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "rubble",
+        "scopeName": "source.rubble",
+        "path": "./syntaxes/rubble.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "rubble",
+        "path": "./snippets/rubble.json"
+      }
+    ]
+  }
+}

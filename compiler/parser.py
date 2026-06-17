@@ -4,13 +4,16 @@ Produces a typed AST from a token stream.
 """
 
 from typing import List, Optional, Tuple
-from .lexer import Token, K
+
 from .ast_nodes import *
+from .lexer import K, Token
 
 
 class ParseError(Exception):
     def __init__(self, msg, tok: Token):
-        super().__init__(f"[Parse Error] {tok.line}:{tok.col}: {msg} (got {tok.kind} {tok.value!r})")
+        super().__init__(
+            f"[Parse Error] {tok.line}:{tok.col}: {msg} (got {tok.kind} {tok.value!r})"
+        )
         self.tok = tok
 
 
@@ -28,7 +31,7 @@ class Parser:
 
     def _peek(self, n=1) -> Token:
         i = self.pos + n
-        return self.tokens[min(i, len(self.tokens)-1)]
+        return self.tokens[min(i, len(self.tokens) - 1)]
 
     def _adv(self) -> Token:
         t = self.tokens[self.pos]
@@ -72,23 +75,47 @@ class Parser:
 
     def _stmt(self) -> Node:
         k = self._cur().kind
-        if k == K.GATHER:    return self._gather()
-        if k == K.RECIPE:    return self._recipe()
-        if k == K.BLUEPRINT: return self._blueprint()
-        if k in (K.SLOT, K.LOCK): return self._slot()
-        if k == K.WRITE:     return self._write()
-        if k == K.YIELD:     return self._yield()
+        if k == K.GATHER:
+            return self._gather()
+        if k == K.RECIPE:
+            return self._recipe()
+        if k == K.BLUEPRINT:
+            return self._blueprint()
+        if k in (K.SLOT, K.LOCK):
+            return self._slot()
+        if k == K.WRITE:
+            return self._write()
+        if k == K.YIELD:
+            return self._yield()
         if k == K.JAM:
-            loc = self._loc(); self._adv(); self._match(K.SEMICOLON)
-            return JamStmt(loc)
+            loc = self._loc()
+            self._adv()
+            # Optional label: jam outer
+            label = None
+            if self._check(K.IDENT):
+                label = self._adv().value
+            self._match(K.SEMICOLON)
+            return JamStmt(loc, label=label)
         if k == K.SKIP:
-            loc = self._loc(); self._adv(); self._match(K.SEMICOLON)
-            return SkipStmt(loc)
-        if k == K.WRECK:     return self._wreck()
-        if k == K.SCRAP:     return self._scrap()
-        if k == K.LOOP:      return self._loop()
-        if k == K.FOR:       return self._foreach()
-        if k == K.IF:        return self._if()
+            loc = self._loc()
+            self._adv()
+            label = None
+            if self._check(K.IDENT):
+                label = self._adv().value
+            self._match(K.SEMICOLON)
+            return SkipStmt(loc, label=label)
+        if k == K.WRECK:
+            return self._wreck()
+        if k == K.SCRAP:
+            return self._scrap()
+        if k == K.LOOP:
+            return self._loop()
+        if k == K.FOR:
+            return self._foreach()
+        if k == K.IF:
+            return self._if()
+        if k == K.MATCH:
+            return self._match_stmt()
         return self._assign_or_expr()
 
     def _gather(self) -> GatherStmt:
@@ -109,20 +136,43 @@ class Parser:
         self._expect(K.LPAREN)
         params = []
         while not self._check(K.RPAREN):
+            # Variadic: ...args: crate[T]
+            if self._check(K.DOTDOTDOT):
+                self._adv()
+                pname = self._expect(K.IDENT, "Expected variadic parameter name").value
+                self._expect(K.COLON)
+                ptype = self._type()
+                params.append(Param(pname, ptype, variadic=True))
+                break  # variadic must be last
             pname = self._expect(K.IDENT, "Expected parameter name").value
             self._expect(K.COLON)
             ptype = self._type()
-            params.append(Param(pname, ptype))
+            # Optional default value
+            default = None
+            if self._match(K.ASSIGN):
+                default = self._expr()
+            params.append(Param(pname, ptype, default=default))
             if not self._match(K.COMMA):
                 break
         self._expect(K.RPAREN)
-        # Return type is optional — default to empty (void)
+        # Return type — single or multi: -> (type, type, ...)
+        ret = TypeNode("empty")
+        return_types = None
         if self._match(K.ARROW):
-            ret = self._type()
-        else:
-            ret = TypeNode("empty")
+            if self._check(K.LPAREN):
+                # Multi-return: -> (unit, text, ...)
+                self._adv()
+                return_types = []
+                while not self._check(K.RPAREN):
+                    return_types.append(self._type())
+                    if not self._match(K.COMMA):
+                        break
+                self._expect(K.RPAREN)
+                ret = TypeNode("empty")  # overridden at codegen
+            else:
+                ret = self._type()
         body = self._block()
-        return RecipeDecl(name, params, ret, body, loc)
+        return RecipeDecl(name, params, ret, body, loc, return_types=return_types)
 
     def _blueprint(self) -> BlueprintDecl:
         loc = self._loc()
@@ -151,50 +201,76 @@ class Parser:
         return SlotDecl(name, val, is_lock, loc)
 
     def _write(self) -> WriteStmt:
-        loc = self._loc(); self._adv()
+        loc = self._loc()
+        self._adv()
         # Support both   write expr   and   write(expr)
         paren = bool(self._match(K.LPAREN))
         val = self._expr()
-        if paren: self._expect(K.RPAREN)
+        if paren:
+            self._expect(K.RPAREN)
         self._match(K.SEMICOLON)
         return WriteStmt(val, loc)
 
     def _yield(self) -> YieldStmt:
-        loc = self._loc(); self._adv()
+        loc = self._loc()
+        self._adv()
         val = self._expr()
+        # Multi-return: yield a, b  — wrap in a CrateLit for codegen to unpack
+        if self._check(K.COMMA):
+            parts = [val]
+            while self._match(K.COMMA):
+                parts.append(self._expr())
+            self._match(K.SEMICOLON)
+            return YieldStmt(CrateLit(parts, loc), loc)
         self._match(K.SEMICOLON)
         return YieldStmt(val, loc)
 
     def _wreck(self) -> WreckStmt:
-        loc = self._loc(); self._adv()
+        loc = self._loc()
+        self._adv()
         paren = bool(self._match(K.LPAREN))
         msg = self._expr()
-        if paren: self._expect(K.RPAREN)
+        if paren:
+            self._expect(K.RPAREN)
         self._match(K.SEMICOLON)
         return WreckStmt(msg, loc)
 
     def _scrap(self) -> ScrapStmt:
-        loc = self._loc(); self._adv()
+        loc = self._loc()
+        self._adv()
         name = self._expect(K.IDENT, "Expected variable name after 'scrap'").value
         self._match(K.SEMICOLON)
         return ScrapStmt(name, loc)
 
     def _loop(self) -> LoopStmt:
-        loc = self._loc(); self._adv()
+        loc = self._loc()
+        self._adv()
+        # Optional label before condition: loop outer: condition { ... }
+        label = None
+        if self._check(K.IDENT) and self._peek().kind == K.COLON:
+            label = self._adv().value
+            self._adv()  # consume ':'
         cond = self._expr()
         body = self._block()
-        return LoopStmt(cond, body, loc)
+        return LoopStmt(cond, body, loc, label=label)
 
     def _foreach(self) -> ForEachStmt:
-        loc = self._loc(); self._adv()
+        loc = self._loc()
+        self._adv()
+        # Optional label: for outer: item in crate { ... }
+        label = None
+        if self._check(K.IDENT) and self._peek(1).kind == K.COLON:
+            label = self._adv().value
+            self._adv()  # consume ':'
         var = self._expect(K.IDENT, "Expected loop variable").value
         self._expect(K.IN)
         it = self._expr()
         body = self._block()
-        return ForEachStmt(var, it, body, loc)
+        return ForEachStmt(var, it, body, loc, label=label)
 
     def _if(self) -> IfStmt:
-        loc = self._loc(); self._adv()
+        loc = self._loc()
+        self._adv()
         cond = self._expr()
         then = self._block()
         elifs = []
@@ -207,6 +283,30 @@ class Parser:
         if self._match(K.ELSE):
             else_ = self._block()
         return IfStmt(cond, then, elifs, else_, loc)
+
+    def _match_stmt(self) -> MatchStmt:
+        """match <expr> { case <expr> => { ... } ... default => { ... } }"""
+        loc = self._loc()
+        self._adv()
+        value = self._expr()
+        self._expect(K.LBRACE)
+        arms = []
+        default_block = None
+        while not self._check(K.RBRACE) and not self._check(K.EOF):
+            if self._check(K.DEFAULT):
+                self._adv()
+                self._expect(K.FAT_ARROW, "Expected '=>' after 'default'")
+                default_block = self._block()
+            elif self._check(K.CASE):
+                self._adv()
+                pat = self._expr()
+                self._expect(K.FAT_ARROW, "Expected '=>' after case pattern")
+                body = self._block()
+                arms.append((pat, body))
+            else:
+                self._err("Expected 'case' or 'default' in match block")
+        self._expect(K.RBRACE)
+        return MatchStmt(value, arms, default_block, loc)
 
     def _assign_or_expr(self) -> Node:
         loc = self._loc()
@@ -236,12 +336,12 @@ class Parser:
 
     def _type(self) -> TypeNode:
         TYPE_MAP = {
-            K.UNIT:      "unit",
+            K.UNIT: "unit",
             K.DECIMAL_T: "decimal",
-            K.TEXT_T:    "text",
-            K.SWITCH:    "switch",
-            K.CRATE:     "crate",
-            K.EMPTY:     "empty",
+            K.TEXT_T: "text",
+            K.SWITCH: "switch",
+            K.CRATE: "crate",
+            K.EMPTY: "empty",
         }
         tok = self._cur()
         if tok.kind == K.WIRE:
@@ -273,63 +373,73 @@ class Parser:
     def _or(self) -> Node:
         left = self._and()
         while self._check(K.OR):
-            loc = self._loc(); op = self._adv().value
+            loc = self._loc()
+            op = self._adv().value
             left = BinOp(left, op, self._and(), loc)
         return left
 
     def _and(self) -> Node:
         left = self._eq()
         while self._check(K.AND):
-            loc = self._loc(); op = self._adv().value
+            loc = self._loc()
+            op = self._adv().value
             left = BinOp(left, op, self._eq(), loc)
         return left
 
     def _eq(self) -> Node:
         left = self._cmp()
         while self._check(K.EQ, K.NEQ):
-            loc = self._loc(); op = self._adv().value
+            loc = self._loc()
+            op = self._adv().value
             left = BinOp(left, op, self._cmp(), loc)
         return left
 
     def _cmp(self) -> Node:
         left = self._add()
         while self._check(K.LT, K.GT, K.LTE, K.GTE):
-            loc = self._loc(); op = self._adv().value
+            loc = self._loc()
+            op = self._adv().value
             left = BinOp(left, op, self._add(), loc)
         return left
 
     def _add(self) -> Node:
         left = self._mul()
         while self._check(K.PLUS, K.MINUS):
-            loc = self._loc(); op = self._adv().value
+            loc = self._loc()
+            op = self._adv().value
             left = BinOp(left, op, self._mul(), loc)
         return left
 
     def _mul(self) -> Node:
         left = self._unary()
         while self._check(K.STAR, K.SLASH, K.PERCENT):
-            loc = self._loc(); op = self._adv().value
+            loc = self._loc()
+            op = self._adv().value
             left = BinOp(left, op, self._unary(), loc)
         return left
 
     def _unary(self) -> Node:
         loc = self._loc()
         if self._check(K.MINUS):
-            self._adv(); return UnaryOp("-", self._unary(), loc)
+            self._adv()
+            return UnaryOp("-", self._unary(), loc)
         if self._check(K.FLIP) or self._check(K.NOT):
-            self._adv(); return UnaryOp("flip", self._unary(), loc)
+            self._adv()
+            return UnaryOp("flip", self._unary(), loc)
         return self._postfix()
 
     def _postfix(self) -> Node:
         expr = self._primary()
         while True:
             if self._check(K.DOT):
-                loc = self._loc(); self._adv()
+                loc = self._loc()
+                self._adv()
                 # Accept any token as field/method name after dot
                 tok = self._cur()
                 if tok.kind == K.EOF:
                     self._err("Expected field or method name after '.'")
-                field = str(tok.value); self._adv()
+                field = str(tok.value)
+                self._adv()
                 if self._check(K.LPAREN):
                     self._adv()
                     args = self._arglist()
@@ -338,7 +448,8 @@ class Parser:
                 else:
                     expr = FieldExpr(expr, field, loc)
             elif self._check(K.LBRACKET):
-                loc = self._loc(); self._adv()
+                loc = self._loc()
+                self._adv()
                 idx = self._expr()
                 self._expect(K.RBRACKET)
                 expr = IndexExpr(expr, idx, loc)
@@ -350,19 +461,37 @@ class Parser:
         loc = self._loc()
         tok = self._cur()
 
-        if tok.kind == K.INT:     self._adv(); return IntLit(tok.value, loc)
-        if tok.kind == K.DECIMAL: self._adv(); return DecimalLit(tok.value, loc)
-        if tok.kind == K.TEXT:    self._adv(); return TextLit(tok.value, loc)
-        if tok.kind == K.TRUE:    self._adv(); return SwitchLit(True, loc)
-        if tok.kind == K.FALSE:   self._adv(); return SwitchLit(False, loc)
-        if tok.kind == K.EMPTY:   self._adv(); return EmptyLit(loc)
+        if tok.kind == K.INT:
+            self._adv()
+            return IntLit(tok.value, loc)
+        if tok.kind == K.DECIMAL:
+            self._adv()
+            return DecimalLit(tok.value, loc)
+        if tok.kind == K.TEXT:
+            self._adv()
+            return TextLit(tok.value, loc)
+        if tok.kind == K.TRUE:
+            self._adv()
+            return SwitchLit(True, loc)
+        if tok.kind == K.FALSE:
+            self._adv()
+            return SwitchLit(False, loc)
+        if tok.kind == K.EMPTY:
+            self._adv()
+            return EmptyLit(loc)
+
+        # Interpolated string — the lexer already tokenised the parts;
+        # we just need to gather them into an InterpTextLit
+        if tok.kind == K.ITEXT_START:
+            return self._interp_text(loc)
 
         if tok.kind == K.LBRACKET:
             self._adv()
             elems = []
             while not self._check(K.RBRACKET):
                 elems.append(self._expr())
-                if not self._match(K.COMMA): break
+                if not self._match(K.COMMA):
+                    break
             self._expect(K.RBRACKET)
             return CrateLit(elems, loc)
 
@@ -391,7 +520,8 @@ class Parser:
                 self._expect(K.COLON)
                 fv = self._expr()
                 kwargs.append((fn, fv))
-                if not self._match(K.COMMA): break
+                if not self._match(K.COMMA):
+                    break
             self._expect(K.RPAREN)
             return BuildExpr(name, kwargs, loc)
 
@@ -416,9 +546,27 @@ class Parser:
 
         self._err(f"Unexpected token in expression")
 
+    def _interp_text(self, loc: Loc) -> InterpTextLit:
+        """Parse ITEXT_START (ITEXT_CHUNK | ITEXT_EXPR_START <expr> ITEXT_EXPR_END)* ITEXT_END"""
+        self._adv()  # consume ITEXT_START
+        parts = []
+        while not self._check(K.ITEXT_END) and not self._check(K.EOF):
+            if self._check(K.ITEXT_CHUNK):
+                parts.append(self._adv().value)  # plain text string
+            elif self._check(K.ITEXT_EXPR_START):
+                self._adv()  # consume {
+                expr = self._expr()
+                parts.append(expr)
+                self._expect(K.ITEXT_EXPR_END)
+            else:
+                self._err("Unexpected token inside interpolated string")
+        self._expect(K.ITEXT_END)
+        return InterpTextLit(parts, loc)
+
     def _arglist(self) -> List[Node]:
         args = []
         while not self._check(K.RPAREN) and not self._check(K.EOF):
             args.append(self._expr())
-            if not self._match(K.COMMA): break
+            if not self._match(K.COMMA):
+                break
         return args

@@ -1,0 +1,97 @@
+{
+  "Recipe": {
+    "prefix": "recipe",
+    "body": ["recipe ${1:name}(${2:params}) -> ${3:unit} {", "\t${0}", "}"],
+    "description": "Define a recipe (function)"
+  },
+  "Blueprint": {
+    "prefix": "blueprint",
+    "body": ["blueprint ${1:Name} {", "\t${2:field}: ${3:unit}", "}"],
+    "description": "Define a blueprint (struct)"
+  },
+  "Slot declaration": {
+    "prefix": "slot",
+    "body": ["slot ${1:name} = ${0}"],
+    "description": "Declare a mutable variable"
+  },
+  "Lock slot": {
+    "prefix": "lock",
+    "body": ["lock slot ${1:NAME} = ${0}"],
+    "description": "Declare a constant"
+  },
+  "If statement": {
+    "prefix": "if",
+    "body": ["if ${1:condition} {", "\t${0}", "}"],
+    "description": "If statement"
+  },
+  "If-else": {
+    "prefix": "ifelse",
+    "body": ["if ${1:condition} {", "\t${2}", "} else {", "\t${0}", "}"],
+    "description": "If-else statement"
+  },
+  "Loop": {
+    "prefix": "loop",
+    "body": ["loop ${1:condition} {", "\t${0}", "}"],
+    "description": "While-style loop"
+  },
+  "For-in": {
+    "prefix": "for",
+    "body": ["for ${1:item} in ${2:crate} {", "\t${0}", "}"],
+    "description": "For-in loop over a crate"
+  },
+  "Match": {
+    "prefix": "match",
+    "body": [
+      "match ${1:value} {",
+      "\tcase ${2:pattern} => {",
+      "\t\t${3}",
+      "\t}",
+      "\tdefault => {",
+      "\t\t${0}",
+      "\t}",
+      "}"
+    ],
+    "description": "Match/switch statement"
+  },
+  "Write": {
+    "prefix": "write",
+    "body": ["write ${0}"],
+    "description": "Print a value"
+  },
+  "Gather": {
+    "prefix": "gather",
+    "body": ["gather ${1:module}"],
+    "description": "Import a stdlib module"
+  },
+  "Build blueprint": {
+    "prefix": "build",
+    "body": ["build ${1:Blueprint}(${2:field}: ${0})"],
+    "description": "Construct a blueprint instance"
+  },
+  "Interpolated string": {
+    "prefix": "fstr",
+    "body": ["f\"${1:text} {${2:expr}}\""],
+    "description": "Interpolated string literal"
+  },
+  "Canvas game loop": {
+    "prefix": "gameloop",
+    "body": [
+      "gather canvas",
+      "",
+      "slot win = canvas.open(\"${1:My Game}\", ${2:800}, ${3:600})",
+      "slot running = 1",
+      "",
+      "loop running > 0 {",
+      "\trunning = canvas.poll(win)",
+      "\tslot dt = canvas.delta_time(win)",
+      "",
+      "\tcanvas.clear(win, ${4:30}, ${4:30}, ${4:30})",
+      "\t${0}",
+      "\tcanvas.show(win)",
+      "}",
+      "",
+      "canvas.close(win)"
+    ],
+    "description": "Canvas game loop skeleton"
+  }
+}

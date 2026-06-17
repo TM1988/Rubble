@@ -1,0 +1,15 @@
+blueprint Point {
+    x: decimal,
+    y: decimal
+}
+
+recipe test_switch(val: unit) -> unit {
+    switch val {
+        case 1 => { yield 10 }
+        case 2 => { yield 20 }
+        default => { yield 0 }
+    }
+}
+
+slot result = test_switch(2)
+write result

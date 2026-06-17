@@ -1,0 +1,140 @@
+{
+  "name": "Rubble",
+  "scopeName": "source.rubble",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#interp-strings" },
+    { "include": "#keywords" },
+    { "include": "#types" },
+    { "include": "#stdlib-modules" },
+    { "include": "#constants" },
+    { "include": "#numbers" },
+    { "include": "#operators" },
+    { "include": "#function-call" },
+    { "include": "#identifiers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.rubble",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.rubble",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "beginCaptures": { "0": { "name": "punctuation.definition.comment.rubble" } },
+          "endCaptures":   { "0": { "name": "punctuation.definition.comment.rubble" } }
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.rubble",
+      "begin": "\"",
+      "end": "\"",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.rubble" } },
+      "endCaptures":   { "0": { "name": "punctuation.definition.string.end.rubble" } },
+      "patterns": [
+        {
+          "name": "constant.character.escape.rubble",
+          "match": "\\\\[ntr\"\\\\0]"
+        }
+      ]
+    },
+    "interp-strings": {
+      "name": "string.interpolated.rubble",
+      "begin": "f\"",
+      "end": "\"",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.rubble" } },
+      "endCaptures":   { "0": { "name": "punctuation.definition.string.end.rubble" } },
+      "patterns": [
+        {
+          "name": "constant.character.escape.rubble",
+          "match": "\\\\[ntr\"\\\\0]"
+        },
+        {
+          "name": "meta.interpolation.rubble",
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": { "0": { "name": "punctuation.section.interpolation.begin.rubble" } },
+          "endCaptures":   { "0": { "name": "punctuation.section.interpolation.end.rubble" } },
+          "patterns": [{ "include": "$self" }]
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.rubble",
+          "match": "\\b(if|elif|else|loop|for|in|jam|skip|match|case|default)\\b"
+        },
+        {
+          "name": "keyword.declaration.rubble",
+          "match": "\\b(recipe|blueprint|slot|lock|gather)\\b"
+        },
+        {
+          "name": "keyword.operator.word.rubble",
+          "match": "\\b(and|or|not|flip)\\b"
+        },
+        {
+          "name": "keyword.other.rubble",
+          "match": "\\b(yield|wreck|scrap|build|wire|unwrap|smelt|write)\\b"
+        }
+      ]
+    },
+    "types": {
+      "name": "storage.type.rubble",
+      "match": "\\b(unit|decimal|text|switch|crate|empty)\\b"
+    },
+    "stdlib-modules": {
+      "name": "support.class.rubble",
+      "match": "\\b(panel|cabinet|machinery|cable|canvas|math|rand|sound|thread)\\b"
+    },
+    "constants": {
+      "name": "constant.language.rubble",
+      "match": "\\b(true|false)\\b"
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.rubble",
+          "match": "\\b\\d+\\.\\d*\\b"
+        },
+        {
+          "name": "constant.numeric.integer.rubble",
+          "match": "\\b\\d+\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.comparison.rubble",
+          "match": "(==|!=|<=|>=|<|>)"
+        },
+        {
+          "name": "keyword.operator.assignment.rubble",
+          "match": "(?<![=!<>])=(?!=)"
+        },
+        {
+          "name": "keyword.operator.arrow.rubble",
+          "match": "(->|=>)"
+        },
+        {
+          "name": "keyword.operator.arithmetic.rubble",
+          "match": "[+\\-*/%]"
+        }
+      ]
+    },
+    "function-call": {
+      "name": "entity.name.function.rubble",
+      "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*(?=\\()"
+    },
+    "identifiers": {
+      "name": "variable.other.rubble",
+      "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
+    }
+  }
+}

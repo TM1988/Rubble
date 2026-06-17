@@ -1,0 +1,41 @@
+// Test all implemented features
+
+// 1. Switch statement
+recipe test_switch(val: unit) -> unit {
+    switch val {
+        case 1 => { yield 10 }
+        case 2 => { yield 20 }
+        default => { yield 0 }
+    }
+}
+
+// 2. Variadic recipe
+recipe sum_all(first: unit, ...rest: crate[unit]) -> unit {
+    slot total = first
+    for item in rest {
+        total = total + item
+    }
+    yield total
+}
+
+// 3. Default parameter values
+recipe greet(name: text, greeting: text = "Hello") -> text {
+    yield f"{greeting}, {name}!"
+}
+
+// Test the features
+slot result1 = test_switch(2)
+write result1
+
+slot result2 = sum_all(10, 20, 30)
+write result2
+
+slot result3 = greet("World")
+write result3
+
+slot result4 = greet("Alice", "Hi")
+write result4
+
+// 4. String interpolation (already working)
+slot message = f"Result 1: {result1}, Result 2: {result2}"
+write message

@@ -1,0 +1,8 @@
+loop outer: {
+    loop inner: {
+        write "hello"
+        if true { skip }  // This should work as continue
+        jam  // This should break the inner loop
+    }
+    jam  // This should break the outer loop
+}

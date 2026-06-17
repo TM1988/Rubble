@@ -1,0 +1,21 @@
+blueprint Point {
+    x: decimal,
+    y: decimal
+}
+
+recipe process_point(p: Point) -> text {
+    switch p.x {
+        case 0.0 => {
+            yield f"Point is at origin ({p.x}, {p.y})"
+        }
+        case 1.0 => {
+            yield f"Point is at x=1, y={p.y}"
+        }
+        default => {
+            yield f"Point is at ({p.x}, {p.y})"
+        }
+    }
+}
+
+slot p = build Point(x: 1.0, y: 2.0)
+write process_point(p)

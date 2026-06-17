@@ -1,0 +1,113 @@
+// Rubble 0.2.0 — advanced features demo
+// Tests: default params, variadics, labeled loops, multi-return,
+//        heap blueprints, time module, json module
+
+gather math
+gather time
+gather json
+gather rand
+
+// ── Default parameter values ──────────────────────────────────────────────
+write "=== default params ==="
+
+recipe greet(name: text, prefix: text = "Hello") -> text {
+    yield prefix + ", " + name + "!"
+}
+
+write greet("Rubble")           // Hello, Rubble!
+write greet("world", "Hey")     // Hey, world!
+
+// ── Variadic recipes ──────────────────────────────────────────────────────
+write "=== variadics ==="
+
+recipe sum_all(...nums: crate[unit]) -> unit {
+    slot total = 0
+    for n in nums {
+        total = total + n
+    }
+    yield total
+}
+
+write sum_all(1, 2, 3, 4, 5)    // 15
+
+// ── Labeled breaks ────────────────────────────────────────────────────────
+write "=== labeled break ==="
+
+slot found = false
+loop outer: found == false {
+    slot i = 0
+    loop i < 5 {
+        if i == 3 {
+            found = true
+            jam outer    // break the outer loop, not just the inner
+        }
+        i = i + 1
+    }
+}
+write found   // true
+
+// ── Heap-allocated blueprints ─────────────────────────────────────────────
+write "=== heap blueprints ==="
+
+blueprint Vec2 {
+    x: decimal,
+    y: decimal
+}
+
+recipe make_vec(x: decimal, y: decimal) -> Vec2 {
+    // build now heap-allocates so this pointer escapes safely
+    yield build Vec2(x: x, y: y)
+}
+
+slot v = make_vec(3.0, 4.0)
+slot dist = math.sqrt(v.x * v.x + v.y * v.y)
+write dist    // 5.0
+
+// Store blueprints in a crate (requires heap allocation)
+slot vecs = [build Vec2(x: 1.0, y: 0.0), build Vec2(x: 0.0, y: 1.0)]
+write vecs[0].x    // 1.0
+write vecs[1].y    // 1.0
+
+// ── Multi-return ──────────────────────────────────────────────────────────
+write "=== multi-return ==="
+
+recipe min_max(a: unit, b: unit) -> (unit, unit) {
+    if a < b {
+        yield a, b
+    }
+    yield b, a
+}
+
+slot result = min_max(7, 3)
+write result.v0    // 3  (min)
+write result.v1    // 7  (max)
+
+// ── time module ───────────────────────────────────────────────────────────
+write "=== time ==="
+
+slot ts = time.now()
+write f"Timestamp: {ts}"
+
+slot formatted = time.format(ts, "%Y-%m-%d")
+write f"Date: {formatted}"
+
+// ── json module ───────────────────────────────────────────────────────────
+write "=== json ==="
+
+slot data = "{\"name\": \"Rubble\", \"version\": 2}"
+slot name_val = json.get(data, "name")
+write f"name = {name_val}"    // name = Rubble
+
+slot updated = json.set(data, "stable", "true")
+write updated
+
+slot encoded = json.encode("hello \"world\"")
+write encoded    // "hello \"world\""
+
+// ── rand with seed ────────────────────────────────────────────────────────
+write "=== rand ==="
+rand.seed(12345)
+write rand.int(1, 100)
+write rand.decimal()
+
+write "ALL ADVANCED FEATURES OK"

@@ -1,0 +1,7 @@
+blueprint Point {
+    x: decimal,
+    y: decimal
+}
+
+slot p = build Point(x: 3.0, y: 4.0)
+write f"Point is at ({p.x}, {p.y})"

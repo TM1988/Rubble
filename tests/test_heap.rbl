@@ -1,0 +1,12 @@
+blueprint Point {
+    x: decimal,
+    y: decimal
+}
+
+recipe make_point(x: decimal, y: decimal) -> Point {
+    yield build Point(x: x, y: y)
+}
+
+slot p = make_point(3.0, 4.0)
+write p.x
+write p.y

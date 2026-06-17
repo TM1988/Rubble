@@ -1,0 +1,96 @@
+// Rubble 0.2.0 — new features demo
+
+gather math
+gather rand
+gather machinery
+
+// ── skip (continue) ──────────────────────────────────────────────────────
+write "=== skip (continue) ==="
+slot i = 0
+loop i < 10 {
+    i = i + 1
+    if i % 2 == 0 { skip }   // only print odd numbers
+    write i
+}
+// prints: 1 3 5 7 9
+
+// ── String interpolation ─────────────────────────────────────────────────
+write "=== string interpolation ==="
+slot name = "Rubble"
+slot ver  = 2
+write f"Hello from {name} version {ver}!"
+
+slot x = 42
+slot pi = math.pi()
+write f"x = {x}, pi = {pi}"
+
+// ── match statement ───────────────────────────────────────────────────────
+write "=== match ==="
+slot score = 85
+match score / 10 {
+    case 10 => { write "Perfect" }
+    case 9  => { write "A" }
+    case 8  => { write "B" }
+    case 7  => { write "C" }
+    default => { write "F" }
+}
+
+// ── Text built-ins ────────────────────────────────────────────────────────
+write "=== text built-ins ==="
+slot greeting = "  Hello, World!  "
+write greeting.trim()
+write greeting.trim().upper()
+write greeting.trim().lower()
+
+slot sentence = "one,two,three"
+slot parts = sentence.split(",")
+write parts.length()
+write parts[0]
+
+slot replaced = sentence.replace(",", " | ")
+write replaced
+
+write sentence.slice(4, 7)       // "two" — bytes 4-6
+write sentence.index("two")      // 4
+
+// ── Crate built-ins ───────────────────────────────────────────────────────
+write "=== crate built-ins ==="
+slot nums = [5, 2, 8, 1, 9, 3]
+nums.sort()
+write nums[0]    // 1
+write nums[5]    // 9
+
+nums.reverse()
+write nums[0]    // 9
+
+slot sub = nums.slice(1, 4)
+write sub.length()   // 3
+
+slot words = ["hello", "world", "rubble"]
+write words.join(", ")   // hello, world, rubble
+
+// ── rand ─────────────────────────────────────────────────────────────────
+write "=== rand ==="
+rand.seed(42)
+write rand.int(1, 6)        // dice roll
+write rand.decimal()        // 0..1
+
+// ── machinery additions ───────────────────────────────────────────────────
+write "=== machinery ==="
+slot ts = machinery.time()
+write f"Unix timestamp: {ts}"
+
+slot path_var = machinery.env("PATH")
+write "PATH starts with env var"
+
+// ── cabinet one-liners ────────────────────────────────────────────────────
+write "=== cabinet ==="
+cabinet.write("test_output.txt", "Hello from Rubble!\n")
+slot exists = cabinet.exists("test_output.txt")
+write exists          // true
+slot content = cabinet.read("test_output.txt")
+write content
+cabinet.delete("test_output.txt")
+write cabinet.exists("test_output.txt")  // false
+
+write "ALL NEW FEATURES OK"

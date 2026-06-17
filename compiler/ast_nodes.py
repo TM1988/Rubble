@@ -70,6 +70,31 @@ class CrateLit(Node):
     elements: List[Node]
     loc: Loc
 
+@dataclass
+class InterpTextLit(Node):
+    """String interpolation: f"hello {name}, you are {age} years old"
+    parts is a list of either str (literal chunk) or Node (expression to interpolate).
+    ""
+    parts: List   # List[str | Node]
+    loc: Loc
+
+
+@dataclass
+class SwitchStmt(Node):
+    value: Node
+    arms: List[Tuple[Node, List[Node]]]  # [(pattern, body)]
+    default_block: Optional[List[Node]]
+    loc: Loc
+
+
+@dataclass
+class MatchExpr(Node):
+    value: Node
+    arms: List[Tuple[Node, Node]]  # [(pattern, expression)]
+    default_expr: Optional[Node]
+    loc: Loc
+
+
 
 # ---------------------------------------------------------------------------
 # Expressions
@@ -164,11 +189,13 @@ class YieldStmt(Node):
 @dataclass
 class JamStmt(Node):
     loc: Loc
+    label: Optional[str] = None   # labeled break: jam outer
 
 @dataclass
 class SkipStmt(Node):
-    """skip — continue to next loop iteration"""
+    """continue — skip to next loop iteration"""
     loc: Loc
+    label: Optional[str] = None   # labeled continue: skip outer
 
 @dataclass
 class WreckStmt(Node):
@@ -198,12 +225,22 @@ class LoopStmt(Node):
     condition: Node
     body: List[Node]
     loc: Loc
+    label: Optional[str] = None   # optional loop label for labeled break/continue
 
 @dataclass
 class ForEachStmt(Node):
     var: str
     iterable: Node
     body: List[Node]
+    loc: Loc
+    label: Optional[str] = None
+
+@dataclass
+class MatchStmt(Node):
+    """match value { case x => block ... default => block }"""
+    value: Node
+    arms: List[Tuple[Node, List[Node]]]   # (pattern_expr, body)
+    default_block: Optional[List[Node]]
     loc: Loc
 
 @dataclass
@@ -220,6 +257,9 @@ class GatherStmt(Node):
 class Param(Node):
     name: str
     type_node: TypeNode
+    default: Optional[Node] = None
+    variadic: bool = False
+    loc: Loc
 
 @dataclass
 class RecipeDecl(Node):
@@ -228,6 +268,9 @@ class RecipeDecl(Node):
     return_type: TypeNode
     body: List[Node]
     loc: Loc
+    # Multi-return: if return_types has >1 entry, the recipe returns a
+    # heap-allocated blueprint named __ret_<name> generated automatically.
+    return_types: Optional[List['TypeNode']] = None  # None = single return
 
 @dataclass
 class BlueprintDecl(Node):

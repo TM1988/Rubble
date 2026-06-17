@@ -8,8 +8,8 @@ slot win = canvas.open("Rubble - Move the ball!", 640, 480)
 
 slot x = 320
 slot y = 240
-slot speed = 4
-slot running = 1
+slot speed = 1
+slot running = 500
 
 loop running > 0 {
     // Poll events — returns 0 if window was closed
