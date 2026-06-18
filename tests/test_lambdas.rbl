@@ -1,0 +1,17 @@
+// Test lambda/closure expressions
+
+write "=== Testing simple lambda ==="
+slot double = fn(x: unit) { x * 2 }
+// For now, lambdas are just expressions - we can't call them yet
+// This tests parsing and type checking
+write "Lambda created"
+
+write "=== Testing lambda with multiple parameters ==="
+slot add = fn(a: unit, b: unit) { a + b }
+write "Lambda with 2 params created"
+
+write "=== Testing lambda with new integer types ==="
+slot add_i8 = fn(a: i8, b: i8) { a + b }
+write "Lambda with i8 params created"
+
+write "ALL LAMBDA TESTS PASSED"
