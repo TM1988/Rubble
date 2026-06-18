@@ -1,0 +1,6 @@
+// Test map types
+
+type StringMap = map<unit, text>
+type IntMap = map<text, unit>
+
+write "ALL MAP TYPE TESTS PASSED"
