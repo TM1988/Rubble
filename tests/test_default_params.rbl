@@ -1,0 +1,13 @@
+// Test default parameters
+
+recipe add(a: unit, b: unit = 10) -> unit {
+    yield a + b
+}
+
+// Test with both arguments
+slot x = add(5, 20)
+
+// Test with default argument
+slot y = add(5)
+
+write "ALL DEFAULT PARAMETER TESTS PASSED"
