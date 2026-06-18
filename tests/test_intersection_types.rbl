@@ -1,0 +1,8 @@
+// Test intersection types
+
+// Intersection types are more complex and typically used for type constraints
+// For now, just test that the syntax is recognized
+
+type MyType = unit & text
+
+write "ALL INTERSECTION TYPE TESTS PASSED"
