@@ -1,0 +1,16 @@
+// Test union types
+
+recipe process(value: unit | text) -> unit {
+    // Function that accepts either unit or text
+    yield value
+}
+
+// Test with unit
+slot x = 42
+slot result1 = process(x)
+
+// Test with text
+slot y = "Hello"
+slot result2 = process(y)
+
+write "ALL UNION TYPE TESTS PASSED"
