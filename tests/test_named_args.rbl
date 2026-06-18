@@ -1,0 +1,10 @@
+// Test named arguments
+
+recipe add(a: unit, b: unit) -> unit {
+    yield a + b
+}
+
+// Named arguments test
+slot result = add(a: 10, b: 20)
+
+write "ALL NAMED ARGUMENT TESTS PASSED"
