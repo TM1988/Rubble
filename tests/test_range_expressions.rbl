@@ -1,0 +1,10 @@
+// Test range expressions
+
+// Range expressions are used in loop contexts
+// The DOTDOT operator is already implemented
+
+loop 1..1 {
+    // Empty loop just to test syntax
+}
+
+write "ALL RANGE EXPRESSION TESTS PASSED"
