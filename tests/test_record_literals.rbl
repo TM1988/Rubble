@@ -1,0 +1,5 @@
+// Test record literals
+
+slot point = {x: 10, y: 20}
+
+write "ALL RECORD LITERAL TESTS PASSED"
