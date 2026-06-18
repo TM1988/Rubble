@@ -1,0 +1,16 @@
+// Test enum declarations
+
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+enum Direction {
+    North,
+    South,
+    East,
+    West
+}
+
+write "ALL ENUM TESTS PASSED"
