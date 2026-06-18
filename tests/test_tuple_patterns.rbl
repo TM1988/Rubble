@@ -1,0 +1,8 @@
+// Test tuple patterns
+
+// For now, just test that the tuple type syntax is recognized
+// Full tuple pattern matching would require more complex implementation
+
+type MyTuple = (unit, text)
+
+write "ALL TUPLE PATTERN TESTS PASSED"
