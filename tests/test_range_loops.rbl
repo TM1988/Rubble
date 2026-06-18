@@ -1,0 +1,38 @@
+// Test range loops with .. syntax
+
+write "=== Testing basic range loop ==="
+for i in 0..5 {
+    write i
+}
+// Should print: 0 1 2 3 4
+
+write "=== Testing range with variables ==="
+slot start = 10
+slot end = 15
+for i in start..end {
+    write i
+}
+// Should print: 10 11 12 13 14
+
+write "=== Testing range with expressions ==="
+for i in (2 + 3)..(7 + 3) {
+    write i
+}
+// Should print: 5 6 7 8 9
+
+write "=== Testing range with new integer types ==="
+slot small: i8 = 0
+for i in small..10 {
+    write i
+}
+// Should print: 0 1 2 3 4 5 6 7 8 9
+
+write "=== Testing nested range loops ==="
+for i in 0..3 {
+    for j in 0..2 {
+        write f"({i}, {j})"
+    }
+}
+// Should print: (0, 0) (0, 1) (1, 0) (1, 1) (2, 0) (2, 1)
+
+write "ALL RANGE LOOP TESTS PASSED"
