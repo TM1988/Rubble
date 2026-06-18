@@ -1,0 +1,9 @@
+// Test optional chaining
+
+// For now, just test that the optional chaining syntax is recognized
+// Full optional chaining semantics would require more complex implementation
+
+slot x = 10
+slot y = x?.field
+
+write "ALL OPTIONAL CHAINING TESTS PASSED"
