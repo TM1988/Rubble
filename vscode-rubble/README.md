@@ -12,14 +12,7 @@ Syntax highlighting, bracket matching, and snippets for `.rbl` files.
 
 ## Install
 
-### From the extension folder (development)
-
-```
-cd vscode-rubble
-code --install-extension .
-```
-
-Or copy the `vscode-rubble` folder into:
+Copy the `vscode-rubble` folder into:
 - Windows: `%USERPROFILE%\.vscode\extensions\`
 - macOS/Linux: `~/.vscode/extensions/`
 
