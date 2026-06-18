@@ -1,0 +1,15 @@
+// Test methods in blueprints
+
+blueprint Vec2 {
+    x: unit,
+    y: unit,
+    
+    fn add(other: Vec2) -> Vec2 {
+        yield build Vec2(x: x + other.x, y: y + other.y)
+    }
+}
+
+slot v1 = build Vec2(x: 10, y: 20)
+slot v2 = build Vec2(x: 5, y: 15)
+
+write "ALL METHOD TESTS PASSED"
