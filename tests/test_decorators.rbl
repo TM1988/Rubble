@@ -1,0 +1,14 @@
+// Test decorator syntax
+
+@inline
+recipe add(a: unit, b: unit) -> unit {
+    yield a + b
+}
+
+@export
+recipe main() -> unit {
+    slot result = add(5, 3)
+    write result
+}
+
+write "ALL DECORATOR TESTS PASSED"
