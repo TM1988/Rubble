@@ -75,12 +75,30 @@ class Parser:
 
     def _stmt(self) -> Node:
         k = self._cur().kind
+        # Handle decorators before recipes/blueprints
+        if k == K.AT:
+            decorators = self._decorators()
+            k = self._cur().kind
+            if k == K.RECIPE:
+                return self._recipe(decorators)
+            elif k == K.BLUEPRINT:
+                return self._blueprint(decorators)
+            else:
+                self._err("Decorators can only be applied to recipes or blueprints")
         if k == K.GATHER:
             return self._gather()
         if k == K.RECIPE:
             return self._recipe()
         if k == K.BLUEPRINT:
             return self._blueprint()
+        if k == K.ENUM:
+            return self._enum()
+        if k == K.CONST:
+            return self._const()
+        if k == K.TYPE:
+            return self._type_alias()
+        if k == K.MODULE:
+            return self._module()
         if k in (K.SLOT, K.LOCK):
             return self._slot()
         if k == K.WRITE:
@@ -129,7 +147,9 @@ class Parser:
         self._match(K.SEMICOLON)
         return GatherStmt(str(name), loc)
 
-    def _recipe(self) -> RecipeDecl:
+    def _recipe(self, decorators: List[Decorator] = None) -> RecipeDecl:
+        if decorators is None:
+            decorators = self._decorators()
         loc = self._loc()
         self._adv()
         name = self._expect(K.IDENT, "Expected recipe name").value
@@ -142,7 +162,7 @@ class Parser:
                 pname = self._expect(K.IDENT, "Expected variadic parameter name").value
                 self._expect(K.COLON)
                 ptype = self._type()
-                params.append(Param(pname, ptype, variadic=True))
+                params.append(Param(pname, ptype, self._loc(), variadic=True))
                 break  # variadic must be last
             pname = self._expect(K.IDENT, "Expected parameter name").value
             self._expect(K.COLON)
@@ -151,7 +171,7 @@ class Parser:
             default = None
             if self._match(K.ASSIGN):
                 default = self._expr()
-            params.append(Param(pname, ptype, default=default))
+            params.append(Param(pname, ptype, self._loc(), default=default))
             if not self._match(K.COMMA):
                 break
         self._expect(K.RPAREN)
@@ -172,33 +192,130 @@ class Parser:
             else:
                 ret = self._type()
         body = self._block()
-        return RecipeDecl(name, params, ret, body, loc, return_types=return_types)
+        return RecipeDecl(name, params, ret, body, loc, return_types=return_types, decorators=decorators)
 
-    def _blueprint(self) -> BlueprintDecl:
+    def _decorators(self) -> List[Decorator]:
+        """Parse zero or more decorators: @inline @export"""
+        decorators = []
+        while self._match(K.AT):
+            loc = self._loc()
+            name = self._expect(K.IDENT, "Expected decorator name").value
+            args = []
+            if self._match(K.LPAREN):
+                while not self._check(K.RPAREN):
+                    args.append(self._expr())
+                    if not self._match(K.COMMA):
+                        break
+                self._expect(K.RPAREN)
+            from .ast_nodes import Decorator
+            decorators.append(Decorator(name, args, loc))
+        return decorators
+
+    def _blueprint(self, decorators: List[Decorator] = None) -> BlueprintDecl:
+        if decorators is None:
+            decorators = self._decorators()
         loc = self._loc()
         self._adv()
         name = self._expect(K.IDENT, "Expected blueprint name").value
         self._expect(K.LBRACE)
         fields = []
+        methods = []
         while not self._check(K.RBRACE):
-            fname = self._expect(K.IDENT, "Expected field name").value
-            self._expect(K.COLON)
-            ftype = self._type()
-            fields.append(Param(fname, ftype))
-            self._match(K.COMMA)
-            self._match(K.SEMICOLON)
+            # Check if this is a method: fn method_name(params) -> return_type { ... }
+            if self._check(K.FN):
+                method_decorators = self._decorators()
+                self._expect(K.FN)
+                # Method name: blueprint_name.method_name or just method_name
+                method_name = self._expect(K.IDENT, "Expected method name").value
+                self._expect(K.LPAREN)
+                params = []
+                while not self._check(K.RPAREN):
+                    pname = self._expect(K.IDENT, "Expected parameter name").value
+                    self._expect(K.COLON)
+                    ptype = self._type()
+                    default = None
+                    if self._match(K.ASSIGN):
+                        default = self._expr()
+                    params.append(Param(pname, ptype, self._loc(), default=default))
+                    if not self._match(K.COMMA):
+                        break
+                self._expect(K.RPAREN)
+                ret = TypeNode("unit")
+                if self._match(K.ARROW):
+                    ret = self._type()
+                body = self._block()
+                from .ast_nodes import MethodDecl
+                methods.append(MethodDecl(name, method_name, params, ret, body, self._loc(), decorators=method_decorators))
+            else:
+                fname = self._expect(K.IDENT, "Expected field name").value
+                self._expect(K.COLON)
+                ftype = self._type()
+                fields.append(Param(fname, ftype, self._loc()))
+                self._match(K.COMMA)
+                self._match(K.SEMICOLON)
         self._expect(K.RBRACE)
-        return BlueprintDecl(name, fields, loc)
+        return BlueprintDecl(name, fields, loc, decorators=decorators, methods=methods)
+
+    def _enum(self) -> EnumDecl:
+        loc = self._loc()
+        self._adv()
+        name = self._expect(K.IDENT, "Expected enum name").value
+        self._expect(K.LBRACE)
+        variants = []
+        while not self._check(K.RBRACE):
+            variant = self._expect(K.IDENT, "Expected variant name").value
+            variants.append(variant)
+            if not self._match(K.COMMA):
+                break
+        self._expect(K.RBRACE)
+        from .ast_nodes import EnumDecl
+        return EnumDecl(name, variants, loc)
+
+    def _const(self) -> ConstDecl:
+        loc = self._loc()
+        self._adv()
+        name = self._expect(K.IDENT, "Expected constant name").value
+        self._expect(K.ASSIGN)
+        value = self._expr()
+        self._match(K.SEMICOLON)
+        from .ast_nodes import ConstDecl
+        return ConstDecl(name, value, loc)
+
+    def _type_alias(self) -> TypeAliasDecl:
+        loc = self._loc()
+        self._adv()
+        name = self._expect(K.IDENT, "Expected type alias name").value
+        self._expect(K.ASSIGN)
+        target_type = self._type()
+        self._match(K.SEMICOLON)
+        from .ast_nodes import TypeAliasDecl
+        return TypeAliasDecl(name, target_type, loc)
+
+    def _module(self) -> ModuleDecl:
+        loc = self._loc()
+        self._adv()
+        name = self._expect(K.IDENT, "Expected module name").value
+        self._expect(K.LBRACE)
+        body = []
+        while not self._check(K.RBRACE):
+            body.append(self._stmt())
+        self._expect(K.RBRACE)
+        from .ast_nodes import ModuleDecl
+        return ModuleDecl(name, body, loc)
 
     def _slot(self) -> SlotDecl:
         loc = self._loc()
         is_lock = bool(self._match(K.LOCK))
         self._expect(K.SLOT)
         name = self._expect(K.IDENT, "Expected variable name").value
+        # Optional type annotation: slot name: type = value
+        type_node = None
+        if self._match(K.COLON):
+            type_node = self._type()
         self._expect(K.ASSIGN)
         val = self._expr()
         self._match(K.SEMICOLON)
-        return SlotDecl(name, val, is_lock, loc)
+        return SlotDecl(name, val, is_lock, loc, type_node)
 
     def _write(self) -> WriteStmt:
         loc = self._loc()
@@ -265,6 +382,11 @@ class Parser:
         var = self._expect(K.IDENT, "Expected loop variable").value
         self._expect(K.IN)
         it = self._expr()
+        # Check if this is a range expression (start..end)
+        if isinstance(it, BinOp) and it.op == "..":
+            # Convert range expression to RangeExpr
+            from .ast_nodes import RangeExpr
+            it = RangeExpr(it.left, it.right, it.loc)
         body = self._block()
         return ForEachStmt(var, it, body, loc, label=label)
 
@@ -299,7 +421,7 @@ class Parser:
                 default_block = self._block()
             elif self._check(K.CASE):
                 self._adv()
-                pat = self._expr()
+                pat = self._pattern()
                 self._expect(K.FAT_ARROW, "Expected '=>' after case pattern")
                 body = self._block()
                 arms.append((pat, body))
@@ -307,6 +429,45 @@ class Parser:
                 self._err("Expected 'case' or 'default' in match block")
         self._expect(K.RBRACE)
         return MatchStmt(value, arms, default_block, loc)
+
+    def _pattern(self) -> Node:
+        """Parse a pattern: can be a destructuring pattern or a simple expression"""
+        loc = self._loc()
+        # Check if this is a tuple pattern: (a, b, ...)
+        if self._check(K.LPAREN):
+            self._adv()
+            patterns = []
+            while not self._check(K.RPAREN):
+                patterns.append(self._pattern())
+                if not self._match(K.COMMA):
+                    break
+            self._expect(K.RPAREN)
+            if len(patterns) > 1:
+                from .ast_nodes import TuplePattern
+                return TuplePattern(patterns, loc)
+            else:
+                # Single pattern in parentheses is just the pattern itself
+                return patterns[0] if patterns else T_EMPTY
+        # Check if this is a destructuring pattern: TypeName(field, field2) or TypeName(field: value, field2: value)
+        if self._check(K.IDENT) and self._peek() and self._peek().kind == K.LPAREN:
+            type_name = self._adv().value
+            self._expect(K.LPAREN)
+            bindings = []
+            while not self._check(K.RPAREN):
+                field_name = self._expect(K.IDENT, "Expected field name").value
+                # Check if there's a default value: field: value
+                if self._match(K.COLON):
+                    default_value = self._expr()
+                    bindings.append((field_name, default_value))
+                else:
+                    bindings.append((field_name, None))
+                if not self._match(K.COMMA):
+                    break
+            self._expect(K.RPAREN)
+            from .ast_nodes import DestructPattern
+            return DestructPattern(type_name, bindings, loc)
+        # Otherwise, parse as a regular expression
+        return self._expr()
 
     def _assign_or_expr(self) -> Node:
         loc = self._loc()
@@ -337,6 +498,13 @@ class Parser:
     def _type(self) -> TypeNode:
         TYPE_MAP = {
             K.UNIT: "unit",
+            K.I8: "i8",
+            K.I16: "i16",
+            K.I32: "i32",
+            K.U8: "u8",
+            K.U16: "u16",
+            K.U32: "u32",
+            K.U64: "u64",
             K.DECIMAL_T: "decimal",
             K.TEXT_T: "text",
             K.SWITCH: "switch",
@@ -344,12 +512,43 @@ class Parser:
             K.EMPTY: "empty",
         }
         tok = self._cur()
+        # Check for tuple type: (type1, type2, ...)
+        if tok.kind == K.LPAREN:
+            self._adv()
+            types = []
+            while not self._check(K.RPAREN):
+                types.append(self._type())
+                if not self._match(K.COMMA):
+                    break
+            self._expect(K.RPAREN)
+            if len(types) > 1:
+                from .ast_nodes import TupleType
+                return TupleType(types, self._loc())
+            else:
+                # Single type in parentheses is just the type itself
+                return types[0] if types else T_EMPTY
         if tok.kind == K.WIRE:
             self._adv()
             self._expect(K.LT)
             inner = self._type()
             self._expect(K.GT)
             return TypeNode("wire", inner)
+        if tok.kind == K.MAP:
+            self._adv()
+            self._expect(K.LT)
+            key_type = self._type()
+            self._expect(K.COMMA)
+            value_type = self._type()
+            self._expect(K.GT)
+            from .ast_nodes import MapType
+            return MapType(key_type, value_type, self._loc())
+        if tok.kind == K.SET:
+            self._adv()
+            self._expect(K.LT)
+            element_type = self._type()
+            self._expect(K.GT)
+            from .ast_nodes import SetType
+            return SetType(element_type, self._loc())
         if tok.kind in TYPE_MAP:
             self._adv()
             name = TYPE_MAP[tok.kind]
@@ -357,10 +556,69 @@ class Parser:
                 inner = self._type()
                 self._expect(K.RBRACKET)
                 return TypeNode("crate", inner)
+            # Check for array type: type[]
+            if self._match(K.LBRACKET):
+                self._expect(K.RBRACKET)
+                from .ast_nodes import ArrayType
+                return ArrayType(TypeNode(name), self._loc())
+            # Check for union type: type | type
+            if self._match(K.OR):
+                types = [TypeNode(name)]
+                while True:
+                    next_type = self._type()
+                    types.append(next_type)
+                    if not self._match(K.OR):
+                        break
+                from .ast_nodes import UnionType
+                return UnionType(types, self._loc())
+            # Check for intersection type: type & type
+            if self._match(K.AND):
+                types = [TypeNode(name)]
+                while True:
+                    next_type = self._type()
+                    types.append(next_type)
+                    if not self._match(K.AND):
+                        break
+                from .ast_nodes import IntersectionType
+                return IntersectionType(types, self._loc())
+            # Check for nullable type: type?
+            if self._match(K.QUESTION):
+                from .ast_nodes import NullableType
+                return NullableType(TypeNode(name), self._loc())
             return TypeNode(name)
         if tok.kind == K.IDENT:
+            ident_value = tok.value
             self._adv()
-            return TypeNode(tok.value)
+            # Check for array type: type[]
+            if self._match(K.LBRACKET):
+                self._expect(K.RBRACKET)
+                from .ast_nodes import ArrayType
+                return ArrayType(TypeNode(ident_value), self._loc())
+            # Check for union type: type | type
+            if self._match(K.OR):
+                types = [TypeNode(ident_value)]
+                while True:
+                    next_type = self._type()
+                    types.append(next_type)
+                    if not self._match(K.OR):
+                        break
+                from .ast_nodes import UnionType
+                return UnionType(types, self._loc())
+            # Check for intersection type: type & type
+            if self._match(K.AND):
+                types = [TypeNode(ident_value)]
+                while True:
+                    next_type = self._type()
+                    types.append(next_type)
+                    if not self._match(K.AND):
+                        break
+                from .ast_nodes import IntersectionType
+                return IntersectionType(types, self._loc())
+            # Check for nullable type: type?
+            if self._match(K.QUESTION):
+                from .ast_nodes import NullableType
+                return NullableType(TypeNode(ident_value), self._loc())
+            return TypeNode(ident_value)
         self._err("Expected a type name")
 
     # ------------------------------------------------------------------
@@ -368,7 +626,15 @@ class Parser:
     # ------------------------------------------------------------------
 
     def _expr(self) -> Node:
-        return self._or()
+        return self._null_coalesce()
+
+    def _null_coalesce(self) -> Node:
+        expr = self._or()
+        if self._match(K.QUESTIONQUESTION):
+            right = self._or()
+            from .ast_nodes import NullCoalesceExpr
+            expr = NullCoalesceExpr(expr, right, self._loc())
+        return expr
 
     def _or(self) -> Node:
         left = self._and()
@@ -408,6 +674,12 @@ class Parser:
             loc = self._loc()
             op = self._adv().value
             left = BinOp(left, op, self._mul(), loc)
+        # Check for .. (range) operator
+        while self._check(K.DOTDOT):
+            loc = self._loc()
+            self._adv()  # consume ..
+            right = self._mul()
+            left = BinOp(left, "..", right, loc)
         return left
 
     def _mul(self) -> Node:
@@ -447,6 +719,17 @@ class Parser:
                     expr = CallExpr(FieldExpr(expr, field, loc), args, loc)
                 else:
                     expr = FieldExpr(expr, field, loc)
+            elif self._check(K.DOTQUESTION):
+                # Optional chaining: obj?.field
+                loc = self._loc()
+                self._adv()
+                tok = self._cur()
+                if tok.kind == K.EOF:
+                    self._err("Expected field or method name after '?.")
+                field = str(tok.value)
+                self._adv()
+                from .ast_nodes import OptionalChainExpr
+                expr = OptionalChainExpr(expr, field, loc)
             elif self._check(K.LBRACKET):
                 loc = self._loc()
                 self._adv()
@@ -460,6 +743,31 @@ class Parser:
     def _primary(self) -> Node:
         loc = self._loc()
         tok = self._cur()
+
+        if tok.kind == K.DOTDOTDOT:
+            self._adv()
+            value = self._primary()
+            from .ast_nodes import SpreadExpr
+            return SpreadExpr(value, loc)
+
+        if tok.kind == K.FN:
+            self._adv()
+            self._expect(K.LPAREN)
+            params = []
+            while not self._check(K.RPAREN):
+                pname = self._expect(K.IDENT, "Expected parameter name").value
+                self._expect(K.COLON)
+                ptype = self._type()
+                default = None
+                if self._match(K.ASSIGN):
+                    default = self._expr()
+                params.append(Param(pname, ptype, self._loc(), default=default))
+                if not self._match(K.COMMA):
+                    break
+            self._expect(K.RPAREN)
+            body = self._block()
+            from .ast_nodes import LambdaExpr
+            return LambdaExpr(params, body, loc)
 
         if tok.kind == K.INT:
             self._adv()
@@ -525,6 +833,21 @@ class Parser:
             self._expect(K.RPAREN)
             return BuildExpr(name, kwargs, loc)
 
+        if tok.kind == K.LBRACE:
+            # Record literal: {x: 10, y: 20}
+            self._adv()
+            fields = {}
+            while not self._check(K.RBRACE):
+                field_name = self._expect(K.IDENT, "Expected field name").value
+                self._expect(K.COLON)
+                field_value = self._expr()
+                fields[field_name] = field_value
+                if not self._match(K.COMMA):
+                    break
+            self._expect(K.RBRACE)
+            from .ast_nodes import RecordLit
+            return RecordLit(fields, loc)
+
         if tok.kind == K.WIRE:
             self._adv()
             name = self._expect(K.IDENT, "Expected variable name after 'wire'").value
@@ -566,7 +889,15 @@ class Parser:
     def _arglist(self) -> List[Node]:
         args = []
         while not self._check(K.RPAREN) and not self._check(K.EOF):
-            args.append(self._expr())
+            # Check if this is a named argument: name: value
+            if self._check(K.IDENT) and self._peek() and self._peek().kind == K.COLON:
+                name = self._adv().value
+                self._expect(K.COLON)
+                value = self._expr()
+                from .ast_nodes import NamedArg
+                args.append(NamedArg(name, value, self._loc()))
+            else:
+                args.append(self._expr())
             if not self._match(K.COMMA):
                 break
         return args
