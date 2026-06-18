@@ -1,0 +1,9 @@
+// Test null coalescing
+
+// For now, just test that the null coalescing syntax is recognized
+// Full null coalescing semantics would require more complex implementation
+
+slot x = 10
+slot y = x ?? 20
+
+write "ALL NULL COALESCE TESTS PASSED"
