@@ -34,6 +34,20 @@ from .type_checker import (
 def llvm_type(t: TypeNode) -> str:
     if t.name == "unit":
         return "i64"
+    if t.name == "i8":
+        return "i8"
+    if t.name == "i16":
+        return "i16"
+    if t.name == "i32":
+        return "i32"
+    if t.name == "u8":
+        return "i8"
+    if t.name == "u16":
+        return "i16"
+    if t.name == "u32":
+        return "i32"
+    if t.name == "u64":
+        return "i64"
     if t.name == "decimal":
         return "double"
     if t.name == "text":
@@ -42,6 +56,8 @@ def llvm_type(t: TypeNode) -> str:
         return "i1"
     if t.name == "empty":
         return "void"
+    if t.name == "fn":
+        return "i8*"  # Function pointer - simplified for now
     if t.name == "wire":
         return llvm_type(t.inner) + "*"
     if t.name == "crate":
@@ -56,7 +72,7 @@ def llvm_type_for_alloca(t: TypeNode) -> str:
     if t.name == "crate":
         inner = llvm_type(t.inner) if t.inner else "i8"
         return f"%Crate_{inner.replace('*', 'p').replace(' ', '_')}"
-    if t.name not in ("unit", "decimal", "text", "switch", "empty", "wire"):
+    if t.name not in ("unit", "i8", "i16", "i32", "u8", "u16", "u32", "u64", "decimal", "text", "switch", "empty", "wire", "fn"):
         return f"%{t.name}"
     return llvm_type(t)
 
@@ -120,6 +136,7 @@ class CodeGen:
         self._lines: List[str] = []
         self._counter = 0
         self._blueprints: Dict[str, BlueprintDecl] = {}
+        self._enums: Dict[str, EnumDecl] = {}
         self._crate_types: set = set()
         self._recipes_map: Dict[str, "RecipeDecl"] = {}  # name -> decl for default args
 
@@ -154,10 +171,12 @@ class CodeGen:
 
     def generate(self, program: Program) -> str:
         self._collect_blueprints(program)
+        self._collect_enums(program)
         self._collect_recipes(program)
         self._emit_prelude()
         self._emit_stdlib_decls()
         self._emit_blueprint_types()
+        self._emit_enum_types()
         self._emit_program(program)
         self._emit_postlude()
         return "\n".join(self._lines)
@@ -290,6 +309,15 @@ class CodeGen:
         self._emit("declare i64  @rubble_thread_spawn(i8*)")
         self._emit("declare void @rubble_thread_join(i64)")
         self._emit("")
+        # http
+        self._emit("declare i8* @rubble_http_get(i8*)")
+        self._emit("")
+        # db
+        self._emit("declare i64  @rubble_db_open(i8*)")
+        self._emit("declare i32  @rubble_db_execute(i64, i8*)")
+        self._emit("declare i8* @rubble_db_query(i64, i8*)")
+        self._emit("declare void @rubble_db_close(i64)")
+        self._emit("")
         # math stdlib
         self._emit("declare double @rubble_math_sqrt(double)")
         self._emit("declare double @rubble_math_cbrt(double)")
@@ -327,6 +355,11 @@ class CodeGen:
             if isinstance(s, BlueprintDecl):
                 self._blueprints[s.name] = s
 
+    def _collect_enums(self, program: Program):
+        for s in program.stmts:
+            if isinstance(s, EnumDecl):
+                self._enums[s.name] = s
+
     def _collect_recipes(self, program: Program):
         for s in program.stmts:
             if isinstance(s, RecipeDecl):
@@ -337,8 +370,18 @@ class CodeGen:
             return
         self._emit("; ---- Blueprint struct types ----")
         for name, bp in self._blueprints.items():
-            fields = ", ".join(llvm_type(f.type_node) for f in bp.fields)
-            self._emit(f"%{name} = type {{ {fields} }}")
+            fields_ll = ", ".join(f"{llvm_type(f.type_node)} %f{i}" for i, f in enumerate(bp.fields))
+            self._emit(f"%{name} = type {{ {fields_ll} }}")
+
+    def _emit_enum_types(self):
+        if not self._enums:
+            return
+        self._emit("; ---- Enum types ----")
+        for name, enum_decl in self._enums.items():
+            # Enums are represented as i64 with variant indices
+            self._emit(f"; {name} enum with {len(enum_decl.variants)} variants")
+            for i, variant in enumerate(enum_decl.variants):
+                self._emit(f"; {name}.{variant} = {i}")
         self._emit("")
 
     # ------------------------------------------------------------------
@@ -521,7 +564,7 @@ class CodeGen:
             self._emit_foreach(node)
         elif isinstance(node, ExprStmt):
             self._emit_expr(node.expr)
-        elif isinstance(node, (RecipeDecl, BlueprintDecl, GatherStmt)):
+        elif isinstance(node, (RecipeDecl, BlueprintDecl, EnumDecl, ConstDecl, Decorator, ModuleDecl, MethodDecl, TypeAliasDecl, UnionType, IntersectionType, NullableType, TupleType, RecordLit, TuplePattern, ArrayType, MapType, SetType, OptionalChainExpr, NullCoalesceExpr, GatherStmt)):
             pass  # handled elsewhere
 
     def _emit_slot(self, node: SlotDecl):
@@ -731,28 +774,57 @@ class CodeGen:
 
         next_lbl = None
         for idx, (pat, body) in enumerate(node.arms):
-            pat_reg = self._emit_expr(pat)
             arm_lbl = self._label("match_arm")
             next_lbl = self._label("match_next")
 
-            # Compare value with pattern
-            cmp_reg = self._fresh("match_cmp")
-            if val_t.name == "decimal":
-                self._emit_indent(f"{cmp_reg} = fcmp oeq double {val_reg}, {pat_reg}")
-            elif val_t.name == "text":
-                strcmp_res = self._fresh("strcmp")
-                self._emit_indent(
-                    f"{strcmp_res} = call i32 @strcmp(i8* {val_reg}, i8* {pat_reg})"
-                )
-                self._emit_indent(f"{cmp_reg} = icmp eq i32 {strcmp_res}, 0")
+            # Check if pattern is a destructuring pattern
+            if isinstance(pat, DestructPattern):
+                # For destructuring patterns, we always match (type checking ensures compatibility)
+                # Extract field values and bind them to variables
+                for field_name, default_value in pat.bindings:
+                    # Get field index from blueprint
+                    if pat.type_name in self._blueprints:
+                        bp = self._blueprints[pat.type_name]
+                        field_idx = None
+                        for i, f in enumerate(bp.fields):
+                            if f.name == field_name:
+                                field_idx = i
+                                break
+                        if field_idx is not None:
+                            # Extract field value
+                            field_reg = self._fresh("field")
+                            self._emit_indent(f"{field_reg} = getelementptr inbounds %{pat.type_name}, %{pat.type_name}* {val_reg}, i32 0, i32 {field_idx}")
+                            field_val = self._fresh("field_val")
+                            field_type = llvm_type(bp.fields[field_idx].type_node)
+                            self._emit_indent(f"{field_val} = load {field_type}, {field_type}* {field_reg}")
+                            # Bind to variable name in locals
+                            self._locals[field_name] = (f"%{field_name}.addr", field_type)
+                            self._emit_indent(f"%{field_name}.addr = alloca {field_type}")
+                            self._emit_indent(f"store {field_type} {field_val}, {field_type}* %{field_name}.addr")
+                # Always branch to arm for destructuring patterns
+                self._emit_indent(f"br label %{arm_lbl}")
             else:
-                self._emit_indent(f"{cmp_reg} = icmp eq i64 {val_reg}, {pat_reg}")
+                pat_reg = self._emit_expr(pat)
+                # Compare value with pattern
+                cmp_reg = self._fresh("match_cmp")
+                if val_t.name == "decimal":
+                    self._emit_indent(f"{cmp_reg} = fcmp oeq double {val_reg}, {pat_reg}")
+                elif val_t.name == "text":
+                    strcmp_res = self._fresh("strcmp")
+                    self._emit_indent(
+                        f"{strcmp_res} = call i32 @strcmp(i8* {val_reg}, i8* {pat_reg})"
+                    )
+                    self._emit_indent(f"{cmp_reg} = icmp eq i32 {strcmp_res}, 0")
+                else:
+                    self._emit_indent(f"{cmp_reg} = icmp eq i64 {val_reg}, {pat_reg}")
 
-            self._emit_indent(f"br i1 {cmp_reg}, label %{arm_lbl}, label %{next_lbl}")
+                self._emit_indent(f"br i1 {cmp_reg}, label %{arm_lbl}, label %{next_lbl}")
+
             self._emit(f"{arm_lbl}:")
             self._emit_block(body)
             self._emit_indent(f"br label %{merge_lbl}")
-            self._emit(f"{next_lbl}:")
+            if not isinstance(pat, DestructPattern):
+                self._emit(f"{next_lbl}:")
 
         if node.default_block:
             self._emit_block(node.default_block)
@@ -784,6 +856,12 @@ class CodeGen:
             self._loop_label_conds.pop(node.label, None)
 
     def _emit_foreach(self, node: ForEachStmt):
+        # Check if this is a range loop (RangeExpr)
+        from .ast_nodes import RangeExpr
+        if isinstance(node.iterable, RangeExpr):
+            self._emit_range_loop(node)
+            return
+
         it_val = self._emit_expr(node.iterable)
         it_t = getattr(node.iterable, "rtype", None)
         idx_alloca = self._fresh("for_idx")
@@ -844,6 +922,65 @@ class CodeGen:
         self._emit_indent(f"{next_idx} = add i64 {cur_idx}, 1")
         self._emit_indent(f"store i64 {next_idx}, i64* {idx_alloca}")
         self._emit_indent(f"br label %{cond_lbl}")
+        self._emit(f"{exit_lbl}:")
+        self._loop_exit_blocks.pop()
+        self._loop_cond_blocks.pop()
+        if node.label:
+            self._loop_label_exits.pop(node.label, None)
+            self._loop_label_conds.pop(node.label, None)
+        if node.var in self._locals:
+            del self._locals[node.var]
+
+    def _emit_range_loop(self, node: ForEachStmt):
+        """Emit code for range loop: for i in start..end"""
+        from .ast_nodes import RangeExpr
+        range_expr = node.iterable
+        start_val = self._emit_expr(range_expr.start)
+        end_val = self._emit_expr(range_expr.end)
+
+        # Allocate counter variable
+        counter_alloca = self._fresh("range_counter")
+        self._emit_indent(f"{counter_alloca} = alloca i64")
+        self._emit_indent(f"store i64 {start_val}, i64* {counter_alloca}")
+
+        # Set up loop labels
+        cond_lbl = self._label("range_cond")
+        body_lbl = self._label("range_body")
+        exit_lbl = self._label("range_exit")
+        self._loop_exit_blocks.append(exit_lbl)
+        self._loop_cond_blocks.append(cond_lbl)
+        if node.label:
+            self._loop_label_exits[node.label] = exit_lbl
+            self._loop_label_conds[node.label] = cond_lbl
+
+        # Jump to condition
+        self._emit_indent(f"br label %{cond_lbl}")
+
+        # Condition block
+        self._emit(f"{cond_lbl}:")
+        cur_counter = self._fresh("cur_counter")
+        self._emit_indent(f"{cur_counter} = load i64, i64* {counter_alloca}")
+        cmp = self._fresh("range_cmp")
+        self._emit_indent(f"{cmp} = icmp slt i64 {cur_counter}, {end_val}")
+        self._emit_indent(f"br i1 {cmp}, label %{body_lbl}, label %{exit_lbl}")
+
+        # Body block
+        self._emit(f"{body_lbl}:")
+        # Store current counter value in loop variable
+        var_alloca = f"%{node.var}.addr"
+        self._emit_indent(f"{var_alloca} = alloca i64")
+        self._emit_indent(f"store i64 {cur_counter}, i64* {var_alloca}")
+        self._locals[node.var] = (var_alloca, "i64")
+
+        self._emit_block(node.body)
+
+        # Increment counter and loop back
+        next_counter = self._fresh("next_counter")
+        self._emit_indent(f"{next_counter} = add i64 {cur_counter}, 1")
+        self._emit_indent(f"store i64 {next_counter}, i64* {counter_alloca}")
+        self._emit_indent(f"br label %{cond_lbl}")
+
+        # Exit block
         self._emit(f"{exit_lbl}:")
         self._loop_exit_blocks.pop()
         self._loop_cond_blocks.pop()
@@ -951,7 +1088,67 @@ class CodeGen:
         if isinstance(node, CrateLit):
             return self._emit_crate_lit(node)
 
+        if isinstance(node, LambdaExpr):
+            return self._emit_lambda(node)
+
+        if isinstance(node, SpreadExpr):
+            # Spread operator: ...value
+            # For now, just emit the value (spread semantics would be context-dependent)
+            return self._emit_expr(node.value)
+
+        if isinstance(node, NamedArg):
+            # Named argument: name: value
+            # For now, just emit the value (named argument semantics would require parameter matching)
+            return self._emit_expr(node.value)
+
         return "null"
+
+    def _emit_lambda(self, node: LambdaExpr) -> str:
+        """Emit a lambda as a function and return a function pointer."""
+        # Generate a unique name for the lambda function
+        lambda_name = self._fresh("lambda")
+        # Save current function state
+        saved_locals = dict(self._locals)
+        saved_ret = self._current_return_type
+
+        # Build parameter list for LLVM
+        param_types = []
+        param_names = []
+        for param in node.params:
+            param_type = param.type_node
+            param_ll = llvm_type(param_type)
+            param_types.append(param_ll)
+            param_names.append(param.name)
+
+        # Emit function definition
+        ret_type = "i64"  # Default to unit (i64) for now
+        self._emit(f"define {ret_type} @{lambda_name}({', '.join(f'{t} %n' for t in param_types)}) {{")
+
+        # Set up locals for parameters
+        self._locals = {}
+        for i, param in enumerate(node.params):
+            param_alloca = f"%{param.name}.addr"
+            param_ll = llvm_type(param.type_node)
+            self._emit_indent(f"{param_alloca} = alloca {param_ll}")
+            self._emit_indent(f"store {param_ll} %n, {param_ll}* {param_alloca}")
+            self._locals[param.name] = (param_alloca, param_ll)
+
+        # Emit lambda body
+        self._emit_block(node.body)
+
+        # Default return if no explicit yield
+        self._emit_indent(f"ret {ret_type} 0")
+
+        self._emit("}")
+
+        # Restore function state
+        self._locals = saved_locals
+        self._current_return_type = saved_ret
+
+        # Return function pointer as i8*
+        ptr_reg = self._fresh("fn_ptr")
+        self._emit_indent(f"{ptr_reg} = bitcast {ret_type} ({', '.join(param_types)})* @{lambda_name} to i8*")
+        return ptr_reg
 
     def _emit_interp_text(self, node: InterpTextLit) -> str:
         """Compile f"hello {name}!" into a series of string concatenations."""
@@ -1334,6 +1531,11 @@ class CodeGen:
         ("sound", "play"): ("rubble_sound_play", "void"),
         ("sound", "stop"): ("rubble_sound_stop", "void"),
         ("thread", "join"): ("rubble_thread_join", "void"),
+        ("http", "get"): ("rubble_http_get", "i8*"),
+        ("db", "open"): ("rubble_db_open", "i64"),
+        ("db", "execute"): ("rubble_db_execute", "i32"),
+        ("db", "query"): ("rubble_db_query", "i8*"),
+        ("db", "close"): ("rubble_db_close", "void"),
         ("rand", "int"): ("rubble_rand_int", "i64"),
         ("rand", "decimal"): ("rubble_rand_decimal", "double"),
         ("rand", "seed"): ("rubble_rand_seed", "void"),
