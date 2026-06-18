@@ -48,6 +48,13 @@ class K:
 
     # Types
     UNIT = "UNIT"
+    I8 = "I8"
+    I16 = "I16"
+    I32 = "I32"
+    U8 = "U8"
+    U16 = "U16"
+    U32 = "U32"
+    U64 = "U64"
     DECIMAL_T = "DECIMAL_T"
     TEXT_T = "TEXT_T"
     SWITCH = "SWITCH"
@@ -57,6 +64,13 @@ class K:
     IF = "IF"
     ELIF = "ELIF"
     ELSE = "ELSE"
+    FN = "FN"
+    ENUM = "ENUM"
+    CONST = "CONST"
+    MODULE = "MODULE"
+    TYPE = "TYPE"
+    MAP = "MAP"
+    SET = "SET"
 
     # Logic
     AND = "AND"
@@ -80,6 +94,11 @@ class K:
     SLASH = "SLASH"
     PERCENT = "PERCENT"
     DOT = "DOT"
+    DOTDOT = "DOTDOT"  # .. for range expressions
+    AT = "AT"  # @ for decorators
+    QUESTION = "QUESTION"  # ? for nullable types
+    DOTQUESTION = "DOTQUESTION"  # ?. for optional chaining
+    QUESTIONQUESTION = "QUESTIONQUESTION"  # ?? for null coalescing
     COMMA = "COMMA"
     COLON = "COLON"
     SEMICOLON = "SEMICOLON"
@@ -125,6 +144,13 @@ KEYWORDS = {
     "true": K.TRUE,
     "false": K.FALSE,
     "unit": K.UNIT,
+    "i8": K.I8,
+    "i16": K.I16,
+    "i32": K.I32,
+    "u8": K.U8,
+    "u16": K.U16,
+    "u32": K.U32,
+    "u64": K.U64,
     "decimal": K.DECIMAL_T,
     "text": K.TEXT_T,
     "switch": K.SWITCH,
@@ -132,6 +158,13 @@ KEYWORDS = {
     "if": K.IF,
     "elif": K.ELIF,
     "else": K.ELSE,
+    "fn": K.FN,
+    "enum": K.ENUM,
+    "const": K.CONST,
+    "module": K.MODULE,
+    "type": K.TYPE,
+    "map": K.MAP,
+    "set": K.SET,
     "and": K.AND,
     "or": K.OR,
     "not": K.NOT,
@@ -314,7 +347,7 @@ class Lexer:
         buf = []
         dot = False
         while self.pos < len(self.src) and (
-            self._cur().isdigit() or (self._cur() == "." and not dot)
+            self._cur().isdigit() or (self._cur() == "." and not dot and self._peek() and self._peek().isdigit())
         ):
             if self._cur() == ".":
                 dot = True
@@ -349,6 +382,14 @@ class Lexer:
             self._adv()
             self._adv()
             return [Token(K.FAT_ARROW, "=>", line, col)]
+        if two == "?.":  # Optional chaining
+            self._adv()
+            self._adv()
+            return [Token(K.DOTQUESTION, "?.", line, col)]
+        if two == "??":  # Null coalescing
+            self._adv()
+            self._adv()
+            return [Token(K.QUESTIONQUESTION, "??", line, col)]
         if two == "==":
             self._adv()
             self._adv()
@@ -365,6 +406,10 @@ class Lexer:
             self._adv()
             self._adv()
             return [Token(K.GTE, ">=", line, col)]
+        if two == "..":
+            self._adv()
+            self._adv()
+            return [Token(K.DOTDOT, "..", line, col)]
 
         three = two + (self._peek(2) or "")
         if three == "...":
@@ -383,6 +428,10 @@ class Lexer:
             "/": K.SLASH,
             "%": K.PERCENT,
             ".": K.DOT,
+            "@": K.AT,
+            "|": K.OR,
+            "&": K.AND,
+            "?": K.QUESTION,
             ",": K.COMMA,
             ":": K.COLON,
             ";": K.SEMICOLON,
@@ -417,7 +466,14 @@ class Lexer:
             if ch == '"':
                 tokens.append(self._string())
                 continue
-            if ch.isdigit() or (ch == "." and self._peek() and self._peek().isdigit()):
+            # Check for .. (range) before checking for numbers
+            if ch == "." and self._peek() == ".":
+                self._adv()
+                self._adv()
+                tokens.append(Token(K.DOTDOT, "..", line, col))
+                continue
+            # Check for numbers (but not if it's a dot that could be part of ..)
+            if ch.isdigit() or (ch == "." and self._peek() and self._peek().isdigit() and self._peek(1) != "."):
                 tokens.append(self._number())
                 continue
             if ch.isalpha() or ch == "_":
