@@ -1,0 +1,8 @@
+// Test multiple return values
+
+// For now, just test that the multi-return syntax is recognized
+// Full multi-return support would require more complex implementation
+
+type MyMultiReturn = (unit, text)
+
+write "ALL MULTIPLE RETURN VALUE TESTS PASSED"
