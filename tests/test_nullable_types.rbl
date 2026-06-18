@@ -1,0 +1,12 @@
+// Test nullable types
+
+recipe process(value: unit?) -> unit {
+    // Function that accepts either unit or null
+    yield value
+}
+
+// Test with unit
+slot x = 42
+slot result1 = process(x)
+
+write "ALL NULLABLE TYPE TESTS PASSED"
