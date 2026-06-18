@@ -1,0 +1,6 @@
+// Test set types
+
+type IntSet = set<unit>
+type TextSet = set<text>
+
+write "ALL SET TYPE TESTS PASSED"
