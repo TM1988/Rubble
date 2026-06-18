@@ -1,0 +1,9 @@
+// Test string interpolation
+
+slot x = 42
+slot y = "Hello"
+
+write "Value: {x}"
+write "Message: {y}"
+
+write "ALL STRING INTERPOLATION TESTS PASSED"
