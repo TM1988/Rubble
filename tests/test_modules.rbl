@@ -1,0 +1,11 @@
+// Test module declarations
+
+module math_utils {
+    const PI = 3.14159
+
+    recipe add(a: unit, b: unit) -> unit {
+        yield a + b
+    }
+}
+
+write "ALL MODULE TESTS PASSED"
