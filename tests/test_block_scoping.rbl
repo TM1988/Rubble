@@ -1,0 +1,12 @@
+// Test block scoping
+
+slot x = 10
+
+if true {
+    slot x = 20  // Shadow outer x
+    write x
+}
+
+write x  // Should still be 10
+
+write "ALL BLOCK SCOPING TESTS PASSED"
