@@ -1,0 +1,9 @@
+// Test type aliases
+
+type MyInt = unit
+type MyString = text
+
+slot x: MyInt = 42
+slot s: MyString = "Hello"
+
+write "ALL TYPE ALIAS TESTS PASSED"
