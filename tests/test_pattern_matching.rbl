@@ -1,0 +1,19 @@
+// Test pattern matching with destructuring
+
+blueprint Vec2 {
+    x: unit,
+    y: unit
+}
+
+slot v = build Vec2(x: 10, y: 20)
+
+match v {
+    case Vec2(x, y) => {
+        write f"Vec2: x={x}, y={y}"
+    }
+    default => {
+        write "Not a Vec2"
+    }
+}
+
+write "ALL PATTERN MATCHING TESTS PASSED"
