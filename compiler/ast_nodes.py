@@ -4,7 +4,7 @@ All nodes carry source location (line, col) for error reporting.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, Dict
 
 
 class Node:
@@ -35,6 +35,75 @@ class TypeNode(Node):
         if self.inner:
             return f"{self.name}[{self.inner}]"
         return self.name
+
+@dataclass
+class UnionType(Node):
+    """Union type: unit | text means either unit or text"""
+    types: List[TypeNode]
+    loc: Loc
+
+@dataclass
+class IntersectionType(Node):
+    """Intersection type: type1 & type2 means both types must be satisfied"""
+    types: List[TypeNode]
+    loc: Loc
+
+@dataclass
+class NullableType(Node):
+    """Nullable type: unit? means either unit or null"""
+    inner_type: TypeNode
+    loc: Loc
+
+@dataclass
+class TupleType(Node):
+    """Tuple type: (unit, text) means a tuple of unit and text"""
+    types: List[TypeNode]
+    loc: Loc
+
+@dataclass
+class RecordLit(Node):
+    """Record literal: {x: 10, y: 20}"""
+    fields: Dict[str, Node]
+    loc: Loc
+
+@dataclass
+class TuplePattern(Node):
+    """Tuple pattern: (a, b) for matching tuples"""
+    patterns: List[Node]
+    loc: Loc
+
+@dataclass
+class ArrayType(Node):
+    """Array type: unit[] means an array of unit"""
+    element_type: TypeNode
+    loc: Loc
+
+@dataclass
+class MapType(Node):
+    """Map type: map[K, V] means a map from K to V"""
+    key_type: TypeNode
+    value_type: TypeNode
+    loc: Loc
+
+@dataclass
+class SetType(Node):
+    """Set type: set[T] means a set of T"""
+    element_type: TypeNode
+    loc: Loc
+
+@dataclass
+class OptionalChainExpr(Node):
+    """Optional chaining: obj?.field or obj?.method()"""
+    target: Node
+    field: str
+    loc: Loc
+
+@dataclass
+class NullCoalesceExpr(Node):
+    """Null coalescing: value ?? default"""
+    value: Node
+    default: Node
+    loc: Loc
 
 
 # ---------------------------------------------------------------------------
@@ -74,7 +143,7 @@ class CrateLit(Node):
 class InterpTextLit(Node):
     """String interpolation: f"hello {name}, you are {age} years old"
     parts is a list of either str (literal chunk) or Node (expression to interpolate).
-    ""
+    """
     parts: List   # List[str | Node]
     loc: Loc
 
@@ -158,6 +227,26 @@ class SmeltExpr(Node):
     target_type: TypeNode
     loc: Loc
 
+@dataclass
+class RangeExpr(Node):
+    """Range expression: start..end for range loops"""
+    start: Node
+    end: Node
+    loc: Loc
+
+@dataclass
+class SpreadExpr(Node):
+    """Spread expression: ...crate or ...array"""
+    value: Node
+    loc: Loc
+
+@dataclass
+class NamedArg(Node):
+    """Named argument in function call: name: value"""
+    name: str
+    value: Node
+    loc: Loc
+
 
 # ---------------------------------------------------------------------------
 # Statements
@@ -169,6 +258,7 @@ class SlotDecl(Node):
     value: Node
     is_lock: bool
     loc: Loc
+    type_node: Optional[TypeNode] = None
 
 @dataclass
 class AssignStmt(Node):
@@ -193,7 +283,7 @@ class JamStmt(Node):
 
 @dataclass
 class SkipStmt(Node):
-    """continue — skip to next loop iteration"""
+    """continue - skip to next loop iteration"""
     loc: Loc
     label: Optional[str] = None   # labeled continue: skip outer
 
@@ -244,6 +334,13 @@ class MatchStmt(Node):
     loc: Loc
 
 @dataclass
+class DestructPattern(Node):
+    """Destructuring pattern: Vec2(x, y) or Point(x: 0, y: 0)"""
+    type_name: str
+    bindings: List[Tuple[str, Optional[Node]]]  # (field_name, optional_value)
+    loc: Loc
+
+@dataclass
 class GatherStmt(Node):
     module: str
     loc: Loc
@@ -257,8 +354,50 @@ class GatherStmt(Node):
 class Param(Node):
     name: str
     type_node: TypeNode
+    loc: Loc
     default: Optional[Node] = None
     variadic: bool = False
+
+@dataclass
+class LambdaExpr(Node):
+    """Lambda/closure expression: fn(x) { x * 2 }"""
+    params: List[Param]
+    body: List[Node]
+    loc: Loc
+
+@dataclass
+class EnumDecl(Node):
+    """Enum declaration: enum Color { Red, Green, Blue }"""
+    name: str
+    variants: List[str]
+    loc: Loc
+
+@dataclass
+class ConstDecl(Node):
+    """Constant declaration: const MAX_SIZE = 1024"""
+    name: str
+    value: Node
+    loc: Loc
+
+@dataclass
+class TypeAliasDecl(Node):
+    """Type alias declaration: type MyInt = unit"""
+    name: str
+    target_type: TypeNode
+    loc: Loc
+
+@dataclass
+class Decorator(Node):
+    """Decorator: @inline or @export"""
+    name: str
+    args: List[Node]  # Optional arguments for the decorator
+    loc: Loc
+
+@dataclass
+class ModuleDecl(Node):
+    """Module declaration: module my_module { ... }"""
+    name: str
+    body: List[Node]
     loc: Loc
 
 @dataclass
@@ -271,12 +410,26 @@ class RecipeDecl(Node):
     # Multi-return: if return_types has >1 entry, the recipe returns a
     # heap-allocated blueprint named __ret_<name> generated automatically.
     return_types: Optional[List['TypeNode']] = None  # None = single return
+    decorators: List['Decorator'] = None  # Decorators like @inline, @export
 
 @dataclass
 class BlueprintDecl(Node):
     name: str
     fields: List[Param]
     loc: Loc
+    decorators: List[Decorator] = None  # Decorators like @export
+    methods: List['MethodDecl'] = None  # Methods defined in the blueprint
+
+@dataclass
+class MethodDecl(Node):
+    """Method declaration inside a blueprint: fn blueprint_name.method_name(params) -> return_type { ... }"""
+    blueprint_name: str
+    name: str
+    params: List[Param]
+    return_type: TypeNode
+    body: List[Node]
+    loc: Loc
+    decorators: List[Decorator] = None
 
 @dataclass
 class Program(Node):
