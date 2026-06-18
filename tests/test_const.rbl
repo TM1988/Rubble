@@ -1,0 +1,11 @@
+// Test const expressions
+
+const MAX_SIZE = 1024
+const PI = 3.14159
+const NAME = "Rubble"
+
+write f"MAX_SIZE = {MAX_SIZE}"
+write f"PI = {PI}"
+write f"NAME = {NAME}"
+
+write "ALL CONST TESTS PASSED"
