@@ -1,0 +1,6 @@
+// Test array types
+
+type IntArray = unit[]
+type TextArray = text[]
+
+write "ALL ARRAY TYPE TESTS PASSED"
