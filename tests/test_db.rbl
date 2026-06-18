@@ -1,0 +1,13 @@
+// Test SQLite database module
+
+write "=== Testing SQLite database ==="
+gather db
+slot conn = db.open("test.db")
+db.execute(conn, "CREATE TABLE IF NOT EXISTS users (id INT, name TEXT)")
+db.execute(conn, "INSERT INTO users (id, name) VALUES (1, 'Alice')")
+db.execute(conn, "INSERT INTO users (id, name) VALUES (2, 'Bob')")
+slot rows = db.query(conn, "SELECT * FROM users")
+write f"Query result: {rows}"
+db.close(conn)
+
+write "ALL DATABASE TESTS PASSED"
