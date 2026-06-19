@@ -21,6 +21,7 @@ class Parser:
     def __init__(self, tokens: List[Token]):
         self.tokens = tokens
         self.pos = 0
+        self.errors: List[str] = []
 
     # ------------------------------------------------------------------
     # Helpers
@@ -50,14 +51,20 @@ class Parser:
     def _expect(self, kind: str, msg: str = "") -> Token:
         if self._cur().kind == kind:
             return self._adv()
-        raise ParseError(msg or f"Expected {kind}", self._cur())
+        error_msg = msg or f"Expected {kind}"
+        self.errors.append(f"[Parse Error] {self._cur().line}:{self._cur().col}: {error_msg} (got {self._cur().kind} {self._cur().value!r})")
+        # Try to recover by advancing to the next token
+        self._adv()
+        return self._cur()
 
     def _loc(self) -> Loc:
         t = self._cur()
         return Loc(t.line, t.col)
 
     def _err(self, msg: str):
-        raise ParseError(msg, self._cur())
+        self.errors.append(f"[Parse Error] {self._cur().line}:{self._cur().col}: {msg}")
+        # Try to recover by advancing to the next token
+        self._adv()
 
     # ------------------------------------------------------------------
     # Entry
@@ -66,7 +73,15 @@ class Parser:
     def parse(self) -> Program:
         stmts = []
         while not self._check(K.EOF):
-            stmts.append(self._stmt())
+            try:
+                stmts.append(self._stmt())
+            except Exception as e:
+                # Catch any unexpected errors and add them to the error list
+                self.errors.append(str(e))
+                self._adv()
+        # Print all errors at the end
+        for error in self.errors:
+            print(error)
         return Program(stmts)
 
     # ------------------------------------------------------------------
