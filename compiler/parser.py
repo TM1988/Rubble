@@ -114,6 +114,8 @@ class Parser:
             return self._type_alias()
         if k == K.MODULE:
             return self._module()
+        if k == K.MACRO:
+            return self._macro()
         if k in (K.SLOT, K.LOCK):
             return self._slot()
         if k == K.WRITE:
@@ -317,6 +319,22 @@ class Parser:
         self._expect(K.RBRACE)
         from .ast_nodes import ModuleDecl
         return ModuleDecl(name, body, loc)
+
+    def _macro(self) -> MacroDecl:
+        loc = self._loc()
+        self._adv()
+        name = self._expect(K.IDENT, "Expected macro name").value
+        self._expect(K.LPAREN, "Expected '(' after macro name")
+        params = []
+        while not self._check(K.RPAREN):
+            param = self._expect(K.IDENT, "Expected parameter name").value
+            params.append(param)
+            if not self._match(K.COMMA):
+                break
+        self._expect(K.RPAREN, "Expected ')' after macro parameters")
+        body = self._block()
+        from .ast_nodes import MacroDecl
+        return MacroDecl(name, params, body, loc)
 
     def _slot(self) -> SlotDecl:
         loc = self._loc()

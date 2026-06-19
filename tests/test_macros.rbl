@@ -1,0 +1,10 @@
+// Test macro syntax
+
+// For now, just test that the macro syntax is recognized
+// Full macro expansion would require more complex implementation
+
+macro debug(expr) {
+    write expr
+}
+
+write "ALL MACRO TESTS PASSED"

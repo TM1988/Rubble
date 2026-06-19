@@ -105,6 +105,21 @@ class NullCoalesceExpr(Node):
     default: Node
     loc: Loc
 
+@dataclass
+class MacroDecl(Node):
+    """Macro declaration: macro name(params) { body }"""
+    name: str
+    params: List[str]
+    body: List[Node]
+    loc: Loc
+
+@dataclass
+class MacroCall(Node):
+    """Macro call: macro_name(args)"""
+    name: str
+    args: List[Node]
+    loc: Loc
+
 
 # ---------------------------------------------------------------------------
 # Literals

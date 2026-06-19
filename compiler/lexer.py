@@ -71,6 +71,7 @@ class K:
     TYPE = "TYPE"
     MAP = "MAP"
     SET = "SET"
+    MACRO = "MACRO"
 
     # Logic
     AND = "AND"
@@ -165,6 +166,7 @@ KEYWORDS = {
     "type": K.TYPE,
     "map": K.MAP,
     "set": K.SET,
+    "macro": K.MACRO,
     "and": K.AND,
     "or": K.OR,
     "not": K.NOT,

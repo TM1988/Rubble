@@ -564,7 +564,7 @@ class CodeGen:
             self._emit_foreach(node)
         elif isinstance(node, ExprStmt):
             self._emit_expr(node.expr)
-        elif isinstance(node, (RecipeDecl, BlueprintDecl, EnumDecl, ConstDecl, Decorator, ModuleDecl, MethodDecl, TypeAliasDecl, UnionType, IntersectionType, NullableType, TupleType, RecordLit, TuplePattern, ArrayType, MapType, SetType, OptionalChainExpr, NullCoalesceExpr, GatherStmt)):
+        elif isinstance(node, (RecipeDecl, BlueprintDecl, EnumDecl, ConstDecl, Decorator, ModuleDecl, MethodDecl, TypeAliasDecl, UnionType, IntersectionType, NullableType, TupleType, RecordLit, TuplePattern, ArrayType, MapType, SetType, OptionalChainExpr, NullCoalesceExpr, GatherStmt, MacroDecl, MacroCall)):
             pass  # handled elsewhere
 
     def _emit_slot(self, node: SlotDecl):

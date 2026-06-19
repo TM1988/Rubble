@@ -236,6 +236,7 @@ class TypeChecker:
         self._consts: Dict[str, ConstDecl] = {}
         self._modules: Dict[str, ModuleDecl] = {}
         self._type_aliases: Dict[str, TypeAliasDecl] = {}
+        self._macros: Dict[str, MacroDecl] = {}
         self._current_return_type: Optional[TypeNode] = None
         self._gathered: set = set()
         self._warnings: List[str] = []
@@ -304,6 +305,8 @@ class TypeChecker:
             elif isinstance(stmt, TypeAliasDecl):
                 self._type_aliases[stmt.name] = stmt
                 self.globals.define(stmt.name, stmt.target_type)
+            elif isinstance(stmt, MacroDecl):
+                self._macros[stmt.name] = stmt
 
     # ------------------------------------------------------------------
     # Statement checking
@@ -337,6 +340,10 @@ class TypeChecker:
 
         elif isinstance(node, TypeAliasDecl):
             # Type aliases are metadata, don't affect type checking beyond declaration
+            pass
+
+        elif isinstance(node, MacroDecl):
+            # Macros are metadata, don't affect type checking
             pass
 
         elif isinstance(node, ModuleDecl):
