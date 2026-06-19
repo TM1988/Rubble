@@ -1,0 +1,16 @@
+// Test error recovery - multiple errors should be reported
+
+slot x = 10
+slot y = 20
+slot z = 30
+
+// Intentional parse error: missing semicolon
+write "Hello"
+
+// Intentional parse error: invalid syntax
+} invalid syntax here {
+
+// This should still be parsed
+write "World"
+
+write "ALL ERROR RECOVERY TESTS PASSED"
