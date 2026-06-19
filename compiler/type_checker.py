@@ -84,12 +84,14 @@ class Scope:
     def __init__(self, parent: Optional['Scope'] = None):
         self._syms: Dict[str, Tuple[TypeNode, bool]] = {}
         self.parent = parent
+        self._used: set = set()
 
     def define(self, name: str, typ: TypeNode, locked: bool = False):
         self._syms[name] = (typ, locked)
 
     def lookup(self, name: str) -> Optional[Tuple[TypeNode, bool]]:
         if name in self._syms:
+            self._used.add(name)
             return self._syms[name]
         if self.parent:
             return self.parent.lookup(name)
@@ -105,6 +107,10 @@ class Scope:
         r = self.lookup(name)
         return r[1] if r else False
 
+    def get_unused(self) -> List[str]:
+        """Get list of unused variables in this scope."""
+        return [name for name in self._syms if name not in self._used]
+
 
 # ---------------------------------------------------------------------------
 # Type error
@@ -113,6 +119,12 @@ class Scope:
 class TypeError_(Exception):
     def __init__(self, msg: str, loc: Loc):
         super().__init__(f"[Type Error] {loc.line}:{loc.col}: {msg}")
+        self.loc = loc
+
+
+class Warning_(Exception):
+    def __init__(self, msg: str, loc: Loc):
+        super().__init__(f"[Warning] {loc.line}:{loc.col}: {msg}")
         self.loc = loc
 
 
@@ -226,6 +238,7 @@ class TypeChecker:
         self._type_aliases: Dict[str, TypeAliasDecl] = {}
         self._current_return_type: Optional[TypeNode] = None
         self._gathered: set = set()
+        self._warnings: List[str] = []
         self._seed_stdlib()
 
     def _seed_stdlib(self):
@@ -247,6 +260,27 @@ class TypeChecker:
         self._scan_top_level(program.stmts)
         for stmt in program.stmts:
             self._check_stmt(stmt, self.globals)
+        # Check for unused variables
+        self._check_unused_variables(self.globals)
+        # Print warnings at the end
+        for warning in self._warnings:
+            print(warning)
+
+    def _check_unused_variables(self, scope: Scope):
+        """Check for unused variables in the given scope."""
+        unused = scope.get_unused()
+        for name in unused:
+            # Skip certain built-in names and stdlib functions
+            if name in ("panel", "cabinet", "machinery", "cable", "canvas", "math",
+                       "rand", "time", "json", "sound", "thread", "http", "db",
+                       "panel_prompt", "panel_grab", "cabinet_list", "cabinet_open",
+                       "cabinet_create", "machinery_rest", "machinery_ram", "machinery_halt",
+                       "cable_connect", "line_read"):
+                continue
+            self._warn(f"Unused variable '{name}'", Loc(0, 0))
+
+    def _warn(self, msg: str, loc: Loc):
+        self._warnings.append(f"[Warning] {loc.line}:{loc.col}: {msg}")
 
     # ------------------------------------------------------------------
     # Pre-scan: register recipe and blueprint names for forward refs
