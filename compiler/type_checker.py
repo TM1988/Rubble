@@ -346,6 +346,10 @@ class TypeChecker:
             # Macros are metadata, don't affect type checking
             pass
 
+        elif isinstance(node, ConstFnDecl):
+            # Const functions are metadata for now, don't affect type checking
+            pass
+
         elif isinstance(node, ModuleDecl):
             # Modules create a new scope for their body
             module_scope = Scope(parent=scope)

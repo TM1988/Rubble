@@ -116,6 +116,8 @@ class Parser:
             return self._module()
         if k == K.MACRO:
             return self._macro()
+        if k == K.CONST_FN:
+            return self._const_fn()
         if k in (K.SLOT, K.LOCK):
             return self._slot()
         if k == K.WRITE:
@@ -335,6 +337,28 @@ class Parser:
         body = self._block()
         from .ast_nodes import MacroDecl
         return MacroDecl(name, params, body, loc)
+
+    def _const_fn(self) -> ConstFnDecl:
+        loc = self._loc()
+        self._adv()
+        name = self._expect(K.IDENT, "Expected const fn name").value
+        self._expect(K.LPAREN, "Expected '(' after const fn name")
+        params = []
+        while not self._check(K.RPAREN):
+            param_name = self._expect(K.IDENT, "Expected parameter name").value
+            param_type = None
+            if self._match(K.COLON):
+                param_type = self._type()
+            from .ast_nodes import Param
+            params.append(Param(param_name, param_type, loc))
+            if not self._match(K.COMMA):
+                break
+        self._expect(K.RPAREN, "Expected ')' after const fn parameters")
+        self._expect(K.ARROW, "Expected '->' after const fn parameters")
+        return_type = self._type()
+        body = self._block()
+        from .ast_nodes import ConstFnDecl
+        return ConstFnDecl(name, params, return_type, body, loc)
 
     def _slot(self) -> SlotDecl:
         loc = self._loc()

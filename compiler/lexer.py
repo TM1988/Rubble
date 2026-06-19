@@ -72,6 +72,7 @@ class K:
     MAP = "MAP"
     SET = "SET"
     MACRO = "MACRO"
+    CONST_FN = "CONST_FN"
 
     # Logic
     AND = "AND"
@@ -368,6 +369,32 @@ class Lexer:
             buf.append(self._adv())
         word = "".join(buf)
         kind = KEYWORDS.get(word, K.IDENT)
+        
+        # Handle "const fn" as a single token
+        if word == "const" and self._peek() and self._peek().isalpha():
+            # Peek ahead to see if the next word is "fn"
+            saved_pos = self.pos
+            # Skip whitespace
+            while self.pos < len(self.src) and self._cur().isspace():
+                self._adv()
+            next_word = []
+            while self.pos < len(self.src) and (
+                self._cur().isalnum() or self._cur() == "_"
+            ):
+                next_word.append(self._cur())
+                self._adv()
+            next_word_str = "".join(next_word)
+            self.pos = saved_pos  # Restore position
+            if next_word_str == "fn":
+                # Consume "const fn" as a single token
+                # Skip whitespace between const and fn
+                while self.pos < len(self.src) and self._cur().isspace():
+                    self._adv()
+                # Consume "fn"
+                for _ in range(2):
+                    self._adv()
+                return Token(K.CONST_FN, "const fn", line, col)
+        
         return Token(kind, word, line, col)
 
     def _single_token(self) -> list:

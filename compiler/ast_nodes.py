@@ -374,6 +374,15 @@ class Param(Node):
     variadic: bool = False
 
 @dataclass
+class ConstFnDecl(Node):
+    """Const function declaration: const fn name(params) -> type { body }"""
+    name: str
+    params: List[Param]
+    return_type: TypeNode
+    body: List[Node]
+    loc: Loc
+
+@dataclass
 class LambdaExpr(Node):
     """Lambda/closure expression: fn(x) { x * 2 }"""
     params: List[Param]
