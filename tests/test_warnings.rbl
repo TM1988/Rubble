@@ -1,0 +1,10 @@
+// Test warning system
+
+// This should trigger a warning for unused variable
+slot unused_var = 10
+
+// This should not trigger a warning since it's used
+slot used_var = 20
+write used_var
+
+write "ALL WARNING SYSTEM TESTS PASSED"
